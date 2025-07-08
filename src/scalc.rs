@@ -3,12 +3,19 @@ use rustfft::{num_complex::Complex, FftPlanner};
 use std::error::Error;
 use std::path::Path;
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum WindowType {
+    Hann,
+    Hamming,
+}
+
 /// Параметры для вычисления спектрограммы
 #[derive(Debug, Clone, Copy)]
 pub struct CalcParams {
     pub n_fft: usize,
     pub hop_length: usize,
     pub window_size: usize,
+    pub window_type: WindowType,
 }
 
 /// Результат вычисления - "мастер-спектрограмма"
@@ -45,10 +52,11 @@ where
     // а не загрузка всего файла в память. Но для демонстрации алгоритма
     // и для большинства файлов этот подход работает отлично и проще.
 
-    // Создаем оконную функцию (Ханна)
-    let window = hann_window(params.window_size);
+    let window = match params.window_type {
+        WindowType::Hann => hann_window(params.window_size),
+        WindowType::Hamming => hamming_window(params.window_size),
+    };
 
-    // Инициализируем планировщик FFT
     let mut planner = FftPlanner::<f32>::new();
     let fft = planner.plan_fft_forward(params.n_fft);
 
@@ -103,11 +111,21 @@ where
     })
 }
 
-/// Генерирует оконную функцию Ханна
+/// Window function Hann
 fn hann_window(size: usize) -> Vec<f32> {
     let mut window = Vec::with_capacity(size);
     for i in 0..size {
         let val = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (size - 1) as f32).cos());
+        window.push(val);
+    }
+    window
+}
+
+/// Window function Hamming
+fn hamming_window(size: usize) -> Vec<f32> {
+    let mut window = Vec::with_capacity(size);
+    for i in 0..size {
+        let val = 0.54 - 0.46 * (2.0 * std::f32::consts::PI * i as f32 / (size - 1) as f32).cos();
         window.push(val);
     }
     window

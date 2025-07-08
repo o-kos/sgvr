@@ -1,8 +1,17 @@
 use super::scalc::SpectrogramData;
 use image::{Rgb, RgbImage};
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum ColorScheme {
+    Navy,
+    Gray,
+    Bloody,
+}
+
+
 /// Основная функция: создает изображение из данных спектрограммы
-pub fn create_spectrogram_image(spec_data: &SpectrogramData, width: u32, height: u32) -> RgbImage {
+pub fn create_spectrogram_image(spec_data: &SpectrogramData, width: u32, height: u32, color_scheme: ColorScheme) -> RgbImage {
+    let _ = color_scheme;
     let mut img = RgbImage::new(width, height);
 
     if spec_data.data.is_empty() {

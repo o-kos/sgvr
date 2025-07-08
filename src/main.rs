@@ -3,33 +3,48 @@
 mod scalc;
 mod sview;
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
-use std::path::PathBuf;
 use std::time::Instant;
+
+#[derive(Copy, Clone, Debug, ValueEnum)]
+enum CliWindowType {
+    Hann,
+    Hamming,
+}
+
+#[derive(Copy, Clone, Debug, ValueEnum)]
+enum CliColorScheme {
+    Navy,
+    Gray,
+    Bloody,
+}
 
 /// Генерирует спектрограмму из WAV файла
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Путь к входному WAV файлу
-    #[arg(short, long)]
-    input: PathBuf,
+    /// Window function type (hann or hamming, default is hann)
+    #[arg(short = 'w', long = "window-type", value_enum, default_value_t = CliWindowType::Hann)]
+    window_type: CliWindowType,
 
-    /// Путь для сохранения выходного PNG файла
-    #[arg(short, long, default_value = "spectrogram.png")]
-    output: PathBuf,
+    /// Color scheme (navy, gray, bloody, default - navy)
+    #[arg(short = 'c', long = "color-scheme", value_enum, default_value_t = CliColorScheme::Navy)]
+    color_scheme: CliColorScheme,
 
-    /// Ширина выходного изображения в пикселях
-    #[arg(long, default_value_t = 1200)]
-    width: u32,
+    /// Target image size in WxH format (default is 2048x512)
+    #[arg(short = 'i', long = "image-size", default_value = "2048x512")]
+    image_size: String,
 
-    /// Высота выходного изображения в пикселях
-    #[arg(long, default_value_t = 800)]
-    height: u32,
+    /// Сохранять предварительный эскиз спектра (по умолчанию - true)
+    #[arg(short = 'p', long = "preview-save", default_value_t = true)]
+    preview_save: bool,
 
-    /// Размер окна FFT (Fast Fourier Transform)
-    #[arg(long, default_value_t = 2048)]
+    /// Имя файла с сигналом
+    file_name: String,
+
+    /// Размерность FFT (по умолчанию - 2048)
+    #[arg(short = 'f', long = "fft-size", default_value_t = 2048)]
     fft_size: usize,
 
     /// Шаг окна (hop length) в сэмплах
@@ -37,16 +52,47 @@ struct Args {
     hop_length: usize,
 }
 
+// Преобразования CLI-типов во внутренние типы
+impl From<CliWindowType> for scalc::WindowType {
+    fn from(w: CliWindowType) -> Self {
+        match w {
+            CliWindowType::Hann => scalc::WindowType::Hann,
+            CliWindowType::Hamming => scalc::WindowType::Hamming,
+        }
+    }
+}
+
+impl From<CliColorScheme> for sview::ColorScheme {
+    fn from(c: CliColorScheme) -> Self {
+        match c {
+            CliColorScheme::Navy => sview::ColorScheme::Navy,
+            CliColorScheme::Gray => sview::ColorScheme::Gray,
+            CliColorScheme::Bloody => sview::ColorScheme::Bloody,
+        }
+    }
+}
+
+fn parse_image_size(s: &str) -> (u32, u32) {
+    let parts: Vec<&str> = s.split('x').collect();
+    if parts.len() == 2 {
+        let w = parts[0].parse().unwrap_or(2048);
+        let h = parts[1].parse().unwrap_or(512);
+        (w, h)
+    } else {
+        (2048, 512)
+    }
+}
+
 fn main() {
     let args = Args::parse();
 
     println!("Параметры выполнения:");
-    println!("  Входной файл: {}", args.input.display());
-    println!("  Выходной файл: {}", args.output.display());
-    println!("  Размер изображения: {}x{}", args.width, args.height);
+    println!("  Входной файл: {}", args.file_name);
+    let (width, height) = parse_image_size(&args.image_size);
+    println!("  Размер изображения: {}x{}", width, height);
     println!(
-        "  Параметры STFT: FFT size = {}, Hop length = {}",
-        args.fft_size, args.hop_length
+        "  Параметры STFT: FFT size = {}, Hop length = {}, Window type = {:?}",
+        args.fft_size, args.hop_length, args.window_type
     );
     println!("--------------------------------------------------");
 
@@ -57,7 +103,8 @@ fn main() {
     let params = scalc::CalcParams {
         n_fft: args.fft_size,
         hop_length: args.hop_length,
-        window_size: args.fft_size, // Для простоты берем размер окна равным размеру FFT
+        window_size: args.fft_size,
+        window_type: args.window_type.into(),
     };
 
     let pb = ProgressBar::new(1); // Длина установится в коллбэке
@@ -66,7 +113,8 @@ fn main() {
         .unwrap()
         .progress_chars("#>-"));
 
-    let spec_data_result = scalc::calculate_spectrogram(&args.input, params, |processed, total| {
+    use std::path::Path;
+    let spec_data_result = scalc::calculate_spectrogram(Path::new(&args.file_name), params, |processed, total| {
         pb.set_length(total as u64);
         pb.set_position(processed as u64);
     });
@@ -86,16 +134,17 @@ fn main() {
     println!("\nЭтап 2: Формирование изображения...");
     let start_view = Instant::now();
 
-    let image = sview::create_spectrogram_image(&spec_data, args.width, args.height);
+    let image = sview::create_spectrogram_image(&spec_data, width, height, args.color_scheme.into());
 
     println!("  Завершено за: {:.2?}", start_view.elapsed());
 
     // --- Этап 3: Сохранение файла ---
     println!("\nЭтап 3: Сохранение файла...");
-    match image.save(&args.output) {
+    let output_path = format!("{}.png", args.file_name);
+    match image.save(&output_path) {
         Ok(_) => println!(
             "  Изображение успешно сохранено в {}",
-            args.output.display()
+            output_path
         ),
         Err(e) => eprintln!("  Ошибка при сохранении изображения: {}", e),
     }
