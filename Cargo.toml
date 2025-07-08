@@ -1,0 +1,16 @@
+[package]
+name = "sgvr"
+version = "0.1.0"
+edition = "2024"
+default-run = "sgvr"
+
+[dependencies]
+hound = "3.5"
+rustfft = "6.2"
+image = "0.25"
+clap = { version = "4.5", features = ["derive"] }
+indicatif = "0.17"
+
+[[bin]]
+name = "gen_test_wav"
+path = "tools/gen_test_wav.rs"
