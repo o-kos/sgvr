@@ -69,7 +69,7 @@ where
     // Двигаемся по сэмплам с шагом hop_length
     for i in 0..total_frames {
         let start = i * params.hop_length;
-        let end = start + params.window_size;
+        let _end = start + params.window_size;
 
         // Копируем кадр данных в буфер, применяя оконную функцию
         for j in 0..params.window_size {
