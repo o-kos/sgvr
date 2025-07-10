@@ -35,7 +35,7 @@ struct Args {
     #[arg(short = 'c', long = "color-scheme", value_enum, default_value_t = CliColorScheme::Oceanic)]
     color_scheme: CliColorScheme,
 
-    /// Target image size in WxH format (default - 2048x512)
+    /// Target image size in WxH format (default: 2048x512)
     #[arg(short = 'i', long = "image-size", default_value = "2048x512")]
     image_size: String,
 
