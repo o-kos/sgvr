@@ -1,7 +1,7 @@
 // spec-vis/src/main.rs
 
 mod scalc;
-mod sview;
+mod srend;
 
 use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -15,24 +15,27 @@ enum CliWindowType {
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
 enum CliColorScheme {
-    Navy,
-    Gray,
-    Bloody,
+    Oceanic,
+    Grayscale,
+    Inferno,
+    Viridis,
+    Synthwave,
+    Sunset,
 }
 
 /// Генерирует спектрограмму из WAV файла
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Window function type (hann or hamming, default is hann)
+    /// Window function type (hann or hamming, default - hann)
     #[arg(short = 'w', long = "window-type", value_enum, default_value_t = CliWindowType::Hann)]
     window_type: CliWindowType,
 
-    /// Color scheme (navy, gray, bloody, default - navy)
-    #[arg(short = 'c', long = "color-scheme", value_enum, default_value_t = CliColorScheme::Navy)]
+    /// Color scheme (oceanic, grayscale, inferno, viridis, synthwave, sunset, default: oceanic)
+    #[arg(short = 'c', long = "color-scheme", value_enum, default_value_t = CliColorScheme::Oceanic)]
     color_scheme: CliColorScheme,
 
-    /// Target image size in WxH format (default is 2048x512)
+    /// Target image size in WxH format (default: 2048x512)
     #[arg(short = 'i', long = "image-size", default_value = "2048x512")]
     image_size: String,
 
@@ -62,12 +65,15 @@ impl From<CliWindowType> for scalc::WindowType {
     }
 }
 
-impl From<CliColorScheme> for sview::ColorScheme {
+impl From<CliColorScheme> for srend::ColorScheme {
     fn from(c: CliColorScheme) -> Self {
         match c {
-            CliColorScheme::Navy => sview::ColorScheme::Navy,
-            CliColorScheme::Gray => sview::ColorScheme::Gray,
-            CliColorScheme::Bloody => sview::ColorScheme::Bloody,
+            CliColorScheme::Grayscale => srend::ColorScheme::Grayscale,
+            CliColorScheme::Inferno => srend::ColorScheme::Inferno,
+            CliColorScheme::Oceanic => srend::ColorScheme::Oceanic,
+            CliColorScheme::Sunset => srend::ColorScheme::Sunset,
+            CliColorScheme::Synthwave => srend::ColorScheme::Synthwave,
+            CliColorScheme::Viridis => srend::ColorScheme::Viridis,
         }
     }
 }
@@ -134,7 +140,7 @@ fn main() {
     println!("\nЭтап 2: Формирование изображения...");
     let start_view = Instant::now();
 
-    let image = sview::create_spectrogram_image(&spec_data, width, height, args.color_scheme.into());
+    let image = srend::create_spectrogram_image(&spec_data, width, height, args.color_scheme.into());
 
     println!("  Завершено за: {:.2?}", start_view.elapsed());
 

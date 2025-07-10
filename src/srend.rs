@@ -3,9 +3,12 @@ use image::{Rgb, RgbImage};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum ColorScheme {
-    Navy,
-    Gray,
-    Bloody,
+    Oceanic,   // linear-gradient(to right, ##01041B, #072e69, #4da4d5, #dcf3ff)
+    Grayscale, // linear-gradient(to right, #000000, #888888, #ffffff)
+    Inferno,   // linear-gradient(to right, #000004, #3b0f70, #ac255e, #f98e09, #fcfd21)
+    Viridis,   // linear-gradient(to right, #440154, #3b528b, #21918c, #5ec962, #fde725)
+    Synthwave, // linear-gradient(to right, #0d0221, #2d134b, #a537fd, #00f6ff)
+    Sunset,    // linear-gradient(to right, #3c031c, #9c1521, #fd6a02, #fec812)
 }
 
 
