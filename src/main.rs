@@ -31,7 +31,7 @@ struct Args {
     #[arg(short = 'w', long = "window-type", value_enum, default_value_t = CliWindowType::Hann)]
     window_type: CliWindowType,
 
-    /// Color scheme (oceanic, grayscale, inferno, viridis, synthware, sunsen, default - oceanic)
+    /// Color scheme (oceanic, grayscale, inferno, viridis, synthwave, sunset, default: oceanic)
     #[arg(short = 'c', long = "color-scheme", value_enum, default_value_t = CliColorScheme::Oceanic)]
     color_scheme: CliColorScheme,
 
