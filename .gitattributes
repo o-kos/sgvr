@@ -1,5 +1,5 @@
 # Vendor directory should be left as-is (binary treatment)
-vendor/**/* -text -diff -merge
+vendor/**/* binary -diff -merge
 
 # Global text normalization
 * text=auto eol=lf
