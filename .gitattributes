@@ -6,7 +6,4 @@
 *.txt text eol=lf
 *.lock text eol=lf
 
-vendor/**/* text eol=lf
-vendor/**/*.rs text eol=lf
-vendor/**/*.toml text eol=lf
-vendor/**/*.md text eol=lf
+vendor/**/* -text -diff -merge
