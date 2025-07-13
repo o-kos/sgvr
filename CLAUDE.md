@@ -85,7 +85,7 @@ See `ai/task.md` for detailed technical specifications and implementation approa
 
 - **Code Language**: All code, comments, and documentation should be written in English
 - **User Communication**: Always respond to users in Russian language
-- **Commit Messages**: Write all commit messages in English
+- **Commit Messages**: Write all commit messages in English. Newer write about claude.ai in commit messages
 - **Vendor Directory**: Never modify files in the `vendor/` directory - these are vendored dependencies
 - **Code Style**: Follow Rust conventions and idiomatic patterns  
 - **Error Handling**: Use proper Result types and meaningful error messages
