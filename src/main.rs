@@ -23,11 +23,11 @@ enum CliColorScheme {
     Sunset,
 }
 
-/// Генерирует спектрограмму из WAV файла
+/// Generates a spectrogram from a WAV file
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Window function type (hann or hamming, default - hann)
+    /// Window function type (hann or hamming, default: hann)
     #[arg(short = 'w', long = "window-type", value_enum, default_value_t = CliWindowType::Hann)]
     window_type: CliWindowType,
 
@@ -39,23 +39,22 @@ struct Args {
     #[arg(short = 'i', long = "image-size", default_value = "2048x512")]
     image_size: String,
 
-    /// Сохранять предварительный эскиз спектра (по умолчанию - true)
+    /// Save preview spectrogram (default: true)
     #[arg(short = 'p', long = "preview-save", default_value_t = true)]
     preview_save: bool,
 
-    /// Имя файла с сигналом
+    /// Input signal filename
     file_name: String,
 
-    /// Размерность FFT (по умолчанию - 2048)
+    /// FFT size (default: 2048)
     #[arg(short = 'f', long = "fft-size", default_value_t = 2048)]
     fft_size: usize,
 
-    /// Шаг окна (hop length) в сэмплах
+    /// Hop length (default: 512)
     #[arg(long, default_value_t = 512)]
     hop_length: usize,
 }
 
-// Преобразования CLI-типов во внутренние типы
 impl From<CliWindowType> for scalc::WindowType {
     fn from(w: CliWindowType) -> Self {
         match w {
@@ -92,18 +91,18 @@ fn parse_image_size(s: &str) -> (u32, u32) {
 fn main() {
     let args = Args::parse();
 
-    println!("Параметры выполнения:");
-    println!("  Входной файл: {}", args.file_name);
+    println!("Execution parameters:");
+    println!("  Input file: {}", args.file_name);
     let (width, height) = parse_image_size(&args.image_size);
-    println!("  Размер изображения: {}x{}", width, height);
+    println!("  Image size: {}x{}", width, height);
     println!(
-        "  Параметры STFT: FFT size = {}, Hop length = {}, Window type = {:?}",
+        "  STFT parameters: FFT size = {}, Hop length = {}, Window type = {:?}",
         args.fft_size, args.hop_length, args.window_type
     );
     println!("--------------------------------------------------");
 
-    // --- Этап 1: Вычисление данных ---
-    println!("Этап 1: Вычисление данных спектрограммы...");
+    // --- Step 1: Data calculation ---
+    println!("Step 1: Calculating spectrogram data...");
     let start_calc = Instant::now();
 
     let params = scalc::CalcParams {
@@ -113,7 +112,7 @@ fn main() {
         window_type: args.window_type.into(),
     };
 
-    let pb = ProgressBar::new(1); // Длина установится в коллбэке
+    let pb = ProgressBar::new(1); // Length will be set in callback
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")
         .unwrap()
@@ -125,35 +124,35 @@ fn main() {
         pb.set_position(processed as u64);
     });
 
-    pb.finish_with_message("Расчет завершен");
+    pb.finish_with_message("Calculation completed");
 
     let spec_data = match spec_data_result {
         Ok(data) => data,
         Err(e) => {
-            eprintln!("Ошибка при расчете спектрограммы: {}", e);
+            eprintln!("Error calculating spectrogram: {}", e);
             return;
         }
     };
-    println!("  Завершено за: {:.2?}", start_calc.elapsed());
+    println!("  Completed in: {:.2?}", start_calc.elapsed());
 
-    // --- Этап 2: Создание изображения ---
-    println!("\nЭтап 2: Формирование изображения...");
+    // --- Step 2: Image creation ---
+    println!("\nStep 2: Creating image...");
     let start_view = Instant::now();
 
     let image = srend::create_spectrogram_image(&spec_data, width, height, args.color_scheme.into());
 
-    println!("  Завершено за: {:.2?}", start_view.elapsed());
+    println!("  Completed in: {:.2?}", start_view.elapsed());
 
-    // --- Этап 3: Сохранение файла ---
-    println!("\nЭтап 3: Сохранение файла...");
+    // --- Step 3: File saving ---
+    println!("\nStep 3: Saving file...");
     let output_path = format!("{}.png", args.file_name);
     match image.save(&output_path) {
         Ok(_) => println!(
-            "  Изображение успешно сохранено в {}",
+            "  Image successfully saved to {}",
             output_path
         ),
-        Err(e) => eprintln!("  Ошибка при сохранении изображения: {}", e),
+        Err(e) => eprintln!("  Error saving image: {}", e),
     }
 
-    println!("\nРабота завершена.");
+    println!("\nWork completed.");
 }

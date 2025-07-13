@@ -1,7 +1,9 @@
+# Vendor directory should never be ignored
+!/vendor/
+
 # Rust
 # Cargo.lock 
-debug/
-target/
+/target/
 **/*.rs.bk
 *.pdb
 
@@ -36,8 +38,11 @@ Thumbs.db
 *.profraw
 
 # Generated images and signal files
-*.png
-*.wav
-*.flac
-*.wavs
-*.iqw
+/*.png
+/*.wav
+/*.flac
+/*.wavs
+/*.iqw
+
+# Vendor directory override - must be last to override all previous rules
+!vendor/**
