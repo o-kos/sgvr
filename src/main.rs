@@ -27,30 +27,30 @@ enum CliColorScheme {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Window function type (hann or hamming, default: hann)
+    /// Window function type
     #[arg(short = 'w', long = "window-type", value_enum, default_value_t = CliWindowType::Hann)]
     window_type: CliWindowType,
 
-    /// Color scheme (oceanic, grayscale, inferno, viridis, synthwave, sunset, default: oceanic)
+    /// Color scheme
     #[arg(short = 'c', long = "color-scheme", value_enum, default_value_t = CliColorScheme::Oceanic)]
     color_scheme: CliColorScheme,
 
-    /// Target image size in WxH format (default: 2048x512)
+    /// Target image size in WxH format
     #[arg(short = 'i', long = "image-size", default_value = "2048x512")]
     image_size: String,
 
-    /// Save preview spectrogram (default: true)
+    /// Save preview spectrogram
     #[arg(short = 'p', long = "preview-save", default_value_t = true)]
     preview_save: bool,
 
     /// Input signal filename
     file_name: String,
 
-    /// FFT size (default: 2048)
+    /// FFT size
     #[arg(short = 'f', long = "fft-size", default_value_t = 2048)]
     fft_size: usize,
 
-    /// Hop length (default: 512)
+    /// Hop length
     #[arg(long, default_value_t = 512)]
     hop_length: usize,
 }
@@ -98,7 +98,7 @@ fn main() {
         "FFT size = {}, Hop length = {}, Window type = {:?}",
         args.fft_size, args.hop_length, args.window_type
     );
-    println!("");
+    println!();
 
     // --- Step 1: Data calculation ---
     println!("Step 1: Calculating spectrogram data...");
