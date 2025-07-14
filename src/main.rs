@@ -10,30 +10,21 @@ use std::time::Instant;
 /// Window function type for FFT
 #[derive(Copy, Clone, Debug, ValueEnum)]
 enum CliWindowType {
-    /// Hann window
     Hann,
-    /// Hamming window
     Hamming,
 }
 
 /// Color scheme for spectrogram rendering
 #[derive(Copy, Clone, Debug, ValueEnum)]
 enum CliColorScheme {
-    /// Oceanic: blue gradients
     Oceanic,
-    /// Grayscale: black to white
     Grayscale,
-    /// Inferno: perceptually uniform, dark to bright
     Inferno,
-    /// Viridis: perceptually uniform, greenish
     Viridis,
-    /// Synthwave: purple/cyan
     Synthwave,
-    /// Sunset: red/orange/yellow
     Sunset,
 }
 
-/// Generates a spectrogram from a WAV file
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -45,7 +36,7 @@ struct Args {
     #[arg(short = 'c', long = "color-scheme", value_enum, default_value_t = CliColorScheme::Oceanic)]
     color_scheme: CliColorScheme,
 
-    /// Target image size in WxH format (e.g. 2048x512)
+    /// Target image size in WxH format
     #[arg(short = 'i', long = "image-size", default_value = "2048x512")]
     image_size: String,
 
@@ -64,7 +55,7 @@ struct Args {
     #[arg(long, default_value_t = 512)]
     hop_length: usize,
 
-    /// Dynamic range in dB
+    /// Dynamic range, dB
     #[arg(short = 'd', long = "dynamic-range", default_value_t = 110.0)]
     dynamic_range: f32,
 }
@@ -93,7 +84,6 @@ impl From<CliColorScheme> for srend::ColorScheme {
     }
 }
 
-/// Parse image size from string in WxH format
 fn parse_image_size(s: &str) -> (u32, u32) {
     let parts: Vec<&str> = s.split('x').collect();
     if parts.len() == 2 {
@@ -105,7 +95,6 @@ fn parse_image_size(s: &str) -> (u32, u32) {
     }
 }
 
-/// Main entry point
 fn main() {
     let args = Args::parse();
 

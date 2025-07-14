@@ -46,15 +46,16 @@ The application processes WAV files with configurable parameters:
 ./sgvr input.wav
 
 # With custom parameters
-./sgvr -f 4096 -w hamming -i 1024x256 -c viridis input.wav
+./sgvr -f 4096 -w hamming -i 1024x256 -c viridis -d 90 input.wav
 ```
 
 Key parameters:
+
 - `-f, --fft-size`: FFT size (default: 2048)
 - `-w, --window-type`: Window function (hann, hamming)
 - `-i, --image-size`: Output dimensions (WxH format)
 - `-c, --color-scheme`: Color palette (oceanic, grayscale, inferno, viridis, synthwave, sunset)
-- `--hop-length`: STFT hop length (default: 512)
+- `-d, --dynamic-range`: Dynamic range in dB (default: 110)
 
 ## Two-Stage Processing Architecture
 
@@ -75,6 +76,7 @@ The project includes vendored dependencies in the `vendor/` directory for offlin
 ## Project Context
 
 This is part of a larger project plan to create a spectrogram visualization tool. The current implementation is the console application phase, with future plans for:
+
 - Async/await support for backend integration
 - Tauri desktop application integration
 - Real-time preview capabilities
