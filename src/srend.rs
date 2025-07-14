@@ -2,6 +2,7 @@ use super::scalc::SpectrogramData;
 use image::{Rgb, RgbImage};
 use hsl::HSL;
 
+/// RGB color structure for gradients and colormaps
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color {
     pub r: u8,
@@ -10,7 +11,9 @@ pub struct Color {
 }
 
 impl Color {
+    /// Create a new Color from r, g, b components
     pub const fn new(r: u8, g: u8, b: u8) -> Self { Self { r, g, b } }
+    /// Create a new Color from a 24-bit integer (0xRRGGBB)
     pub const fn new_rgb(rgb: u32) -> Self { 
         Self { 
             r: ((rgb >> 16) & 0xFF) as u8, 
@@ -20,13 +23,20 @@ impl Color {
     }
 }
 
+/// Supported color schemes for spectrogram rendering
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum ColorScheme {
+    /// Oceanic: blue gradients
     Oceanic,   // linear-gradient(to right, #01041B, #072e69, #4da4d5, #dcf3ff)
+    /// Grayscale: black to white
     Grayscale, // linear-gradient(to right, #000000, #888888, #ffffff)
+    /// Inferno: perceptually uniform, dark to bright
     Inferno,   // linear-gradient(to right, #000004, #3b0f70, #ac255e, #f98e09, #fcfd21)
+    /// Viridis: perceptually uniform, greenish
     Viridis,   // linear-gradient(to right, #440154, #3b528b, #21918c, #5ec962, #fde725)
+    /// Synthwave: purple/cyan
     Synthwave, // linear-gradient(to right, #0d0221, #2d134b, #a537fd, #00f6ff)
+    /// Sunset: red/orange/yellow
     Sunset,    // linear-gradient(to right, #3c031c, #9c1521, #fd6a02, #fec812)
 }
 
@@ -73,6 +83,7 @@ const SUNSET: [Color; 4] = [
     Color::new_rgb(0xfec812),
 ];
 
+/// Returns a reference to the color stops for a given color scheme
 fn get_color_stops(scheme: ColorScheme) -> &'static [Color] {
     match scheme {
         ColorScheme::Oceanic   => &OCEANIC,
@@ -84,11 +95,20 @@ fn get_color_stops(scheme: ColorScheme) -> &'static [Color] {
     }
 }
 
+/// Create a spectrogram image from data, with given size, color scheme, and dynamic range (dB)
+///
+/// - `spec_data`: Spectrogram data (matrix of dB values)
+/// - `width`, `height`: Output image size in pixels
+/// - `color_scheme`: Color scheme for rendering
+/// - `dynamic_range`: Dynamic range in dB (e.g., 110.0)
+///
+/// Returns: RGB image
 pub fn create_spectrogram_image(
     spec_data: &SpectrogramData,
     width: u32,
     height: u32,
     color_scheme: ColorScheme,
+    dynamic_range: f32,
 ) -> RgbImage {
     let color_stops = get_color_stops(color_scheme);
     let gradient = generate_gradient_hsl(color_stops);
@@ -103,7 +123,7 @@ pub fn create_spectrogram_image(
     let master_height = spec_data.data[0].len(); 
 
     // Find global min and max dB for color normalization
-    let (min_db, max_db) = find_db_range(&spec_data.data);
+    let (min_db, max_db) = find_db_range(&spec_data.data, dynamic_range);
 
     for x in 0..width {
         // Determine the range of columns in master data covered by this pixel column `x`
@@ -142,8 +162,13 @@ pub fn create_spectrogram_image(
     img
 }
 
-/// Find the minimum and maximum value of dB in the data
-fn find_db_range(data: &[Vec<f32>]) -> (f32, f32) {
+/// Find the minimum and maximum value of dB in the data, limiting the minimum by dynamic_range
+///
+/// - `data`: 2D array of dB values
+/// - `dynamic_range`: Maximum range to show (in dB)
+///
+/// Returns: (min_db, max_db)
+fn find_db_range(data: &[Vec<f32>], dynamic_range: f32) -> (f32, f32) {
     let mut min_db = f32::MAX;
     let mut max_db = f32::MIN;
     for col in data {
@@ -157,12 +182,17 @@ fn find_db_range(data: &[Vec<f32>]) -> (f32, f32) {
         }
     }
     // For a decent view, we can limit the dynamic range
-    let min_db = max_db - 80.0; // Show the range in 80 dB
+    let min_db = max_db - dynamic_range; 
     (min_db, max_db)
 }
 
 const GRADIENT_SIZE: usize = 256;
 
+/// Generate a smooth HSL gradient from a list of color stops
+///
+/// - `stops`: Reference colors (at least 2)
+///
+/// Returns: Array of 256 interpolated Color values
 pub fn generate_gradient_hsl(stops: &[Color]) -> [Color; GRADIENT_SIZE] {
     if stops.is_empty() { panic!("List of reference colors cannot be empty"); }
     if stops.len() == 1 { return [stops[0]; GRADIENT_SIZE]; }
