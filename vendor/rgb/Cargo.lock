@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "rgb"
-version = "0.8.51"
+version = "0.8.52"
 dependencies = [
  "bytemuck",
  "defmt 0.3.100",

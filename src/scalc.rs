@@ -23,11 +23,7 @@ pub struct CalcParams {
 pub struct SpectrogramData {
     /// Данные спектрограммы: Vec<столбец_частот>
     /// Каждый столбец - это вектор амплитуд (в dB) для одного временного отсчета
-    pub data: Vec<Vec<f32>>,
-    /// Частота дискретизации исходного файла
-    pub sample_rate: u32,
-    /// Размер FFT, он же определяет количество частотных бинов
-    pub n_fft: usize,
+    pub data: Vec<Vec<f32>>
 }
 
 /// Основная функция модуля: читает WAV и вычисляет спектрограмму
@@ -40,7 +36,7 @@ where
     F: FnMut(usize, usize),
 {
     let mut reader = WavReader::open(path)?;
-    let spec = reader.spec();
+    let _spec = reader.spec();
 
     // Читаем все сэмплы и конвертируем их в f32 в диапазоне [-1.0, 1.0]
     let samples: Vec<f32> = reader
@@ -105,9 +101,7 @@ where
     }
 
     Ok(SpectrogramData {
-        data: spectrogram_data,
-        sample_rate: spec.sample_rate,
-        n_fft: params.n_fft,
+        data: spectrogram_data
     })
 }
 
