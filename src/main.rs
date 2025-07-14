@@ -7,19 +7,29 @@ use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Instant;
 
+/// Window function type for FFT
 #[derive(Copy, Clone, Debug, ValueEnum)]
 enum CliWindowType {
+    /// Hann window
     Hann,
+    /// Hamming window
     Hamming,
 }
 
+/// Color scheme for spectrogram rendering
 #[derive(Copy, Clone, Debug, ValueEnum)]
 enum CliColorScheme {
+    /// Oceanic: blue gradients
     Oceanic,
+    /// Grayscale: black to white
     Grayscale,
+    /// Inferno: perceptually uniform, dark to bright
     Inferno,
+    /// Viridis: perceptually uniform, greenish
     Viridis,
+    /// Synthwave: purple/cyan
     Synthwave,
+    /// Sunset: red/orange/yellow
     Sunset,
 }
 
@@ -35,7 +45,7 @@ struct Args {
     #[arg(short = 'c', long = "color-scheme", value_enum, default_value_t = CliColorScheme::Oceanic)]
     color_scheme: CliColorScheme,
 
-    /// Target image size in WxH format
+    /// Target image size in WxH format (e.g. 2048x512)
     #[arg(short = 'i', long = "image-size", default_value = "2048x512")]
     image_size: String,
 
@@ -53,8 +63,13 @@ struct Args {
     /// Hop length
     #[arg(long, default_value_t = 512)]
     hop_length: usize,
+
+    /// Dynamic range in dB
+    #[arg(short = 'd', long = "dynamic-range", default_value_t = 110.0)]
+    dynamic_range: f32,
 }
 
+/// Convert CLI window type to internal window type
 impl From<CliWindowType> for scalc::WindowType {
     fn from(w: CliWindowType) -> Self {
         match w {
@@ -64,6 +79,7 @@ impl From<CliWindowType> for scalc::WindowType {
     }
 }
 
+/// Convert CLI color scheme to internal color scheme
 impl From<CliColorScheme> for srend::ColorScheme {
     fn from(c: CliColorScheme) -> Self {
         match c {
@@ -77,6 +93,7 @@ impl From<CliColorScheme> for srend::ColorScheme {
     }
 }
 
+/// Parse image size from string in WxH format
 fn parse_image_size(s: &str) -> (u32, u32) {
     let parts: Vec<&str> = s.split('x').collect();
     if parts.len() == 2 {
@@ -88,6 +105,7 @@ fn parse_image_size(s: &str) -> (u32, u32) {
     }
 }
 
+/// Main entry point
 fn main() {
     let args = Args::parse();
 
@@ -95,8 +113,8 @@ fn main() {
     let (width, height) = parse_image_size(&args.image_size);
     println!("Generate {}x{}px spec image with color scheme '{:?}'", width, height, args.color_scheme);
     println!(
-        "FFT size = {}, Hop length = {}, Window type = {:?}",
-        args.fft_size, args.hop_length, args.window_type
+        "FFT size = {}, Hop length = {}, Window type = {:?}, Dynamic range = {} dB",
+        args.fft_size, args.hop_length, args.window_type, args.dynamic_range
     );
     println!();
 
@@ -138,7 +156,7 @@ fn main() {
     println!("\nStep 2: Creating image...");
     let start_view = Instant::now();
 
-    let image = srend::create_spectrogram_image(&spec_data, width, height, args.color_scheme.into());
+    let image = srend::create_spectrogram_image(&spec_data, width, height, args.color_scheme.into(), args.dynamic_range);
 
     println!("  Completed in: {:.2?}", start_view.elapsed());
 
