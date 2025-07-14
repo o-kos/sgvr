@@ -91,15 +91,14 @@ fn parse_image_size(s: &str) -> (u32, u32) {
 fn main() {
     let args = Args::parse();
 
-    println!("Execution parameters:");
-    println!("  Input file: {}", args.file_name);
+    println!("Process file: '{}'", args.file_name);
     let (width, height) = parse_image_size(&args.image_size);
-    println!("  Image size: {}x{}", width, height);
+    println!("Generate {}x{}px spec image with color scheme '{:?}'", width, height, args.color_scheme);
     println!(
-        "  STFT parameters: FFT size = {}, Hop length = {}, Window type = {:?}",
+        "FFT size = {}, Hop length = {}, Window type = {:?}",
         args.fft_size, args.hop_length, args.window_type
     );
-    println!("--------------------------------------------------");
+    println!("");
 
     // --- Step 1: Data calculation ---
     println!("Step 1: Calculating spectrogram data...");
