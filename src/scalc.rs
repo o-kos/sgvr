@@ -106,7 +106,7 @@ where
 }
 
 /// Window function Hann
-fn hann_window(size: usize) -> Vec<f32> {
+pub fn hann_window(size: usize) -> Vec<f32> {
     let mut window = Vec::with_capacity(size);
     for i in 0..size {
         let val = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (size - 1) as f32).cos());
@@ -116,11 +116,16 @@ fn hann_window(size: usize) -> Vec<f32> {
 }
 
 /// Window function Hamming
-fn hamming_window(size: usize) -> Vec<f32> {
+pub fn hamming_window(size: usize) -> Vec<f32> {
     let mut window = Vec::with_capacity(size);
     for i in 0..size {
         let val = 0.54 - 0.46 * (2.0 * std::f32::consts::PI * i as f32 / (size - 1) as f32).cos();
         window.push(val);
     }
     window
+}
+
+#[cfg(test)]
+mod tests {
+    include!("scalc_tests.rs");
 }

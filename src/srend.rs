@@ -11,9 +11,7 @@ pub struct Color {
 }
 
 impl Color {
-    /// Create a new Color from r, g, b components
     pub const fn new(r: u8, g: u8, b: u8) -> Self { Self { r, g, b } }
-    /// Create a new Color from a 24-bit integer (0xRRGGBB)
     pub const fn new_rgb(rgb: u32) -> Self { 
         Self { 
             r: ((rgb >> 16) & 0xFF) as u8, 
@@ -26,22 +24,16 @@ impl Color {
 /// Supported color schemes for spectrogram rendering
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum ColorScheme {
-    /// Oceanic: blue gradients
     Oceanic,   // linear-gradient(to right, #01041B, #072e69, #4da4d5, #dcf3ff)
-    /// Grayscale: black to white
     Grayscale, // linear-gradient(to right, #000000, #888888, #ffffff)
-    /// Inferno: perceptually uniform, dark to bright
     Inferno,   // linear-gradient(to right, #000004, #3b0f70, #ac255e, #f98e09, #fcfd21)
-    /// Viridis: perceptually uniform, greenish
     Viridis,   // linear-gradient(to right, #440154, #3b528b, #21918c, #5ec962, #fde725)
-    /// Synthwave: purple/cyan
     Synthwave, // linear-gradient(to right, #0d0221, #2d134b, #a537fd, #00f6ff)
-    /// Sunset: red/orange/yellow
     Sunset,    // linear-gradient(to right, #3c031c, #9c1521, #fd6a02, #fec812)
 }
 
 const OCEANIC: [Color; 4] = [
-    Color::new_rgb(0x01041B),
+    Color::new_rgb(0x01041B), 
     Color::new_rgb(0x072e69),
     Color::new_rgb(0x4da4d5),
     Color::new_rgb(0xdcf3ff),
@@ -83,8 +75,7 @@ const SUNSET: [Color; 4] = [
     Color::new_rgb(0xfec812),
 ];
 
-/// Returns a reference to the color stops for a given color scheme
-fn get_color_stops(scheme: ColorScheme) -> &'static [Color] {
+pub fn get_color_stops(scheme: ColorScheme) -> &'static [Color] {
     match scheme {
         ColorScheme::Oceanic   => &OCEANIC,
         ColorScheme::Grayscale => &GRAYSCALE,
@@ -123,7 +114,11 @@ pub fn create_spectrogram_image(
     let master_height = spec_data.data[0].len(); 
 
     // Find global min and max dB for color normalization
-    let (min_db, max_db) = find_db_range(&spec_data.data, dynamic_range);
+    let max_db = spec_data.data.iter()
+        .flat_map(|col| col.iter())
+        .cloned()
+        .fold(f32::MIN, f32::max);
+    let min_db = max_db - dynamic_range;
 
     for x in 0..width {
         // Determine the range of columns in master data covered by this pixel column `x`
@@ -162,30 +157,6 @@ pub fn create_spectrogram_image(
     img
 }
 
-/// Find the minimum and maximum value of dB in the data, limiting the minimum by dynamic_range
-///
-/// - `data`: 2D array of dB values
-/// - `dynamic_range`: Maximum range to show (in dB)
-///
-/// Returns: (min_db, max_db)
-fn find_db_range(data: &[Vec<f32>], dynamic_range: f32) -> (f32, f32) {
-    let mut min_db = f32::MAX;
-    let mut max_db = f32::MIN;
-    for col in data {
-        for &val in col {
-            if val < min_db {
-                min_db = val;
-            }
-            if val > max_db {
-                max_db = val;
-            }
-        }
-    }
-    // For a decent view, we can limit the dynamic range
-    let min_db = max_db - dynamic_range; 
-    (min_db, max_db)
-}
-
 const GRADIENT_SIZE: usize = 256;
 
 /// Generate a smooth HSL gradient from a list of color stops
@@ -197,7 +168,7 @@ pub fn generate_gradient_hsl(stops: &[Color]) -> [Color; GRADIENT_SIZE] {
     if stops.is_empty() { panic!("List of reference colors cannot be empty"); }
     if stops.len() == 1 { return [stops[0]; GRADIENT_SIZE]; }
 
-    // 1. Convert our RGB colors to HSL
+    // Convert our RGB colors to HSL
     let hsl_stops: Vec<HSL> = stops.iter()
         .map(|c| HSL::from_rgb(&[c.r, c.g, c.b]))
         .collect();
@@ -218,7 +189,7 @@ pub fn generate_gradient_hsl(stops: &[Color]) -> [Color; GRADIENT_SIZE] {
         let start_hsl = hsl_stops[segment_index];
         let end_hsl = hsl_stops[segment_index + 1];
 
-        // 2. Interpolation of H, S, L components
+        // Interpolation of H, S, L components
 
         // S and L are interpolated linearly, as before
         let s = start_hsl.s + (end_hsl.s - start_hsl.s) * segment_progress;
@@ -240,10 +211,15 @@ pub fn generate_gradient_hsl(stops: &[Color]) -> [Color; GRADIENT_SIZE] {
 
         let new_hsl = HSL { h, s, l };
 
-        // 3. Convert the result back to RGB
+        // Convert the result back to RGB
         let (r, g, b) = new_hsl.to_rgb();
         gradient[i] = Color::new(r, g, b);
     }
 
     gradient
+}
+
+#[cfg(test)]
+mod tests {
+    include!("srend_tests.rs");
 }
