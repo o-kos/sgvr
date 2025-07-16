@@ -8,14 +8,14 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Instant;
 
 /// Window function type for FFT
-#[derive(Copy, Clone, Debug, ValueEnum)]
+#[derive(Copy, Clone, Debug, ValueEnum, PartialEq)]
 enum CliWindowType {
     Hann,
     Hamming,
 }
 
 /// Color scheme for spectrogram rendering
-#[derive(Copy, Clone, Debug, ValueEnum)]
+#[derive(Copy, Clone, Debug, ValueEnum, PartialEq)]
 enum CliColorScheme {
     Oceanic,
     Grayscale,
@@ -84,15 +84,20 @@ impl From<CliColorScheme> for srend::ColorScheme {
     }
 }
 
+const DEFAULT_IMAGE_WIDTH: u32 = 2048;
+const DEFAULT_IMAGE_HEIGHT: u32 = 512;
+
 fn parse_image_size(s: &str) -> (u32, u32) {
     let parts: Vec<&str> = s.split('x').collect();
     if parts.len() == 2 {
-        let w = parts[0].parse().unwrap_or(2048);
-        let h = parts[1].parse().unwrap_or(512);
-        (w, h)
-    } else {
-        (2048, 512)
+        let w = parts[0].parse().unwrap_or(DEFAULT_IMAGE_WIDTH);
+        let h = parts[1].parse().unwrap_or(DEFAULT_IMAGE_HEIGHT);
+        // Return (w, h) only if both are non-zero, otherwise fall through to default
+        if w != 0 && h != 0 {
+            return (w, h);
+        }
     }
+    (DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT)
 }
 
 fn main() {
@@ -107,8 +112,7 @@ fn main() {
     );
     println!();
 
-    // --- Step 1: Data calculation ---
-    println!("Step 1: Calculating spectrogram data...");
+    println!("Calculating spectrogram data...");
     let start_calc = Instant::now();
 
     let params = scalc::CalcParams {
@@ -141,16 +145,14 @@ fn main() {
     };
     println!("  Completed in: {:.2?}", start_calc.elapsed());
 
-    // --- Step 2: Image creation ---
-    println!("\nStep 2: Creating image...");
+    println!("\nCreating image...");
     let start_view = Instant::now();
 
     let image = srend::create_spectrogram_image(&spec_data, width, height, args.color_scheme.into(), args.dynamic_range);
 
     println!("  Completed in: {:.2?}", start_view.elapsed());
 
-    // --- Step 3: File saving ---
-    println!("\nStep 3: Saving file...");
+    println!("\nSaving file...");
     let output_path = format!("{}.png", args.file_name);
     match image.save(&output_path) {
         Ok(_) => println!(
@@ -160,5 +162,10 @@ fn main() {
         Err(e) => eprintln!("  Error saving image: {}", e),
     }
 
-    println!("\nWork completed.");
+    println!("\nCompleted.");
+}
+
+#[cfg(test)]
+mod tests {
+    include!("main_tests.rs");
 }
