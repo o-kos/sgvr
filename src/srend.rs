@@ -4,15 +4,15 @@ use hsl::HSL;
 
 /// RGB color structure for gradients and colormaps
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
+struct Color {
+    r: u8,
+    g: u8,
+    b: u8,
 }
 
 impl Color {
-    pub const fn new(r: u8, g: u8, b: u8) -> Self { Self { r, g, b } }
-    pub const fn new_rgb(rgb: u32) -> Self { 
+    const fn new(r: u8, g: u8, b: u8) -> Self { Self { r, g, b } }
+    const fn new_rgb(rgb: u32) -> Self {
         Self { 
             r: ((rgb >> 16) & 0xFF) as u8, 
             g: ((rgb >>  8) & 0xFF) as u8, 
@@ -75,7 +75,7 @@ const SUNSET: [Color; 4] = [
     Color::new_rgb(0xfec812),
 ];
 
-pub fn get_color_stops(scheme: ColorScheme) -> &'static [Color] {
+fn get_color_stops(scheme: ColorScheme) -> &'static [Color] {
     match scheme {
         ColorScheme::Oceanic   => &OCEANIC,
         ColorScheme::Grayscale => &GRAYSCALE,
@@ -164,7 +164,7 @@ const GRADIENT_SIZE: usize = 256;
 /// - `stops`: Reference colors (at least 2)
 ///
 /// Returns: Array of 256 interpolated Color values
-pub fn generate_gradient_hsl(stops: &[Color]) -> [Color; GRADIENT_SIZE] {
+fn generate_gradient_hsl(stops: &[Color]) -> [Color; GRADIENT_SIZE] {
     if stops.is_empty() { panic!("List of reference colors cannot be empty"); }
     if stops.len() == 1 { return [stops[0]; GRADIENT_SIZE]; }
 
