@@ -1,5 +1,6 @@
 // spec-vis/src/main.rs
 
+mod audio;
 mod scalc;
 mod srend;
 
@@ -129,7 +130,15 @@ fn main() {
         .progress_chars("#>-"));
 
     use std::path::Path;
-    let spec_data_result = scalc::calculate_spectrogram(Path::new(&args.file_name), params, |processed, total| {
+    let reader = match audio::create_audio_reader(Path::new(&args.file_name)) {
+        Ok(reader) => reader,
+        Err(e) => {
+            eprintln!("Error opening audio file: {}", e);
+            return;
+        }
+    };
+    
+    let spec_data_result = scalc::calculate_spectrogram(reader, params, |processed, total| {
         pb.set_length(total as u64);
         pb.set_position(processed as u64);
     });

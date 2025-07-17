@@ -1,7 +1,6 @@
-use hound::WavReader;
+use crate::audio::AudioReader;
 use rustfft::{num_complex::Complex, FftPlanner};
 use std::error::Error;
-use std::path::Path;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum WindowType {
@@ -26,23 +25,17 @@ pub struct SpectrogramData {
     pub data: Vec<Vec<f32>>
 }
 
-/// Основная функция модуля: читает WAV и вычисляет спектрограмму
+/// Основная функция модуля: читает аудиофайл и вычисляет спектрограмму
 pub fn calculate_spectrogram<F>(
-    path: &Path,
+    mut reader: Box<dyn AudioReader>,
     params: CalcParams,
     mut progress_callback: F,
 ) -> Result<SpectrogramData, Box<dyn Error>>
 where
     F: FnMut(usize, usize),
 {
-    let mut reader = WavReader::open(path)?;
-    let _spec = reader.spec();
-
-    // Читаем все сэмплы и конвертируем их в f32 в диапазоне [-1.0, 1.0]
-    let samples: Vec<f32> = reader
-        .samples::<i16>()
-        .map(|s| s.unwrap() as f32 / i16::MAX as f32)
-        .collect();
+    // Читаем все сэмплы (уже в диапазоне [-1.0, 1.0])
+    let samples = reader.read_samples()?;
 
     // NOTE: Для ОЧЕНЬ больших файлов здесь нужна потоковая обработка,
     // а не загрузка всего файла в память. Но для демонстрации алгоритма
