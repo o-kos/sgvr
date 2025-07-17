@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(cargo test)",
-      "Bash(cargo test:*)"
+      "Bash(cargo test:*)",
+      "Bash(cargo:*)",
+      "Bash(rm:*)",
+      "Bash(rustc:*)",
+      "Bash(./test_audio_reader)"
     ],
     "deny": []
   }

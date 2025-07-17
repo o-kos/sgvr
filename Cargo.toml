@@ -6,6 +6,7 @@ default-run = "sgvr"
 
 [dependencies]
 hound = "3.5"
+claxon = "0.4"
 rustfft = "6.2"
 image = "0.25"
 clap = { version = "4.5", features = ["derive"] }
