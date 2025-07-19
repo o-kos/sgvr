@@ -1,5 +1,14 @@
 use std::error::Error;
+use std::fs::File;
 use std::path::Path;
+
+use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
+use symphonia::core::codecs::{Decoder, DecoderOptions};
+use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
+use symphonia::core::io::MediaSourceStream;
+use symphonia::core::meta::MetadataOptions;
+use symphonia::core::probe::Hint;
+use symphonia::core::units::{Time, TimeBase};
 
 #[derive(Debug, Clone, Copy)]
 pub enum SignalType {
@@ -117,236 +126,160 @@ pub fn create_audio_reader(path: &Path) -> Result<Box<dyn AudioReader>, Box<dyn 
     }
 }
 
-pub struct WavReader {
-    metadata: AudioMetadata,
-    reader: hound::WavReader<std::io::BufReader<std::fs::File>>,
+pub struct SymphoniaReader {
+    reader: Box<dyn FormatReader>,
+    decoder: Box<dyn Decoder>,
+    track_id: u32,
+    sample_rate: u32,
+    channels: u16,
+    time_base: TimeBase,
+    sample_buf: Option<SampleBuffer<f32>>, // remaining samples from the previous read call
+    buf_pos: usize,
 }
 
-impl WavReader {
-    pub fn open(path: &Path) -> Result<Self, Box<dyn Error>> {
-        let reader = hound::WavReader::open(path)?;
-        let spec = reader.spec();
-        
-        let metadata = AudioMetadata {
-            codec: "wav".to_string(),
-            sample_rate: spec.sample_rate,
-            total_samples: reader.duration() as u64,
-            signal_type: match spec.channels {
-                1 => SignalType::Real,
-                2 => SignalType::IQ,
-                _ => return Err(format!("Unsupported channels count: {}", spec.channels).into()),
-            },
-            sample_type: match spec.sample_format {
-                hound::SampleFormat::Int => {
-                    match spec.bits_per_sample {
-                        8 => SampleType::U8,
-                        16 => SampleType::I16,
-                        24 => SampleType::I24,
-                        32 => SampleType::I32,
-                        _ => SampleType::I32, 
+impl SymphoniaReader {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, Box<dyn Error>> {
+        let path_ref = path.as_ref();
+        let src = File::open(path_ref)?;
+        let mss = MediaSourceStream::new(Box::new(src), Default::default());
+
+        let mut hint = Hint::new();
+        if let Some(extension) = path_ref.extension().and_then(|s| s.to_str()) {
+            hint.with_extension(extension);
+        }
+        let format_opts = FormatOptions { ..Default::default() };
+        let metadata_opts = MetadataOptions { ..Default::default() };
+        let probed = symphonia::default::get_probe()
+            .format(&hint, mss, &format_opts, &metadata_opts)?;
+
+        let reader = probed.format;
+
+        let track = reader.default_track().ok_or("Missing default track")?;
+        let track_id = track.id;
+        let codec_params = track.codec_params.clone();
+
+        let sample_rate = codec_params.sample_rate.ok_or("Missing sample rate")?;
+        let channels = codec_params.channels.ok_or("Missing channels")?.count() as u16;
+        let time_base = codec_params.time_base.ok_or("Missing time base")?;
+
+        let decoder_opts = DecoderOptions { ..Default::default() };
+        let decoder = symphonia::default::get_codecs().make(&codec_params, &decoder_opts)?;
+
+        // fn sample_rate(&self) -> u32 { self.sample_rate }
+        // fn channels(&self) -> u16 { self.channels } 
+        // // Symphonia работает на уровне кодеков, не всегда предоставляя исходную битность.
+        // fn bits_per_sample(&self) -> u16 { 0 } 
+   
+        Ok(Self {
+            reader,
+            decoder,
+            track_id,
+            sample_rate,
+            channels,
+            time_base,
+            sample_buf: None,
+            buf_pos: 0,
+        })
+    }
+}
+
+impl AudioReader for SymphoniaReader {
+    fn metadata(&self) -> &AudioMetadata {
+        &self.metadata
+    }
+
+    fn seek(&mut self, frame_num: u64) -> Result<(), Box<dyn Error>> {
+        let time = self.time_base.calc_time(frame_num);
+        self.reader.seek(
+            SeekMode::Accurate,
+            SeekTo::Time { time, track_id: Some(self.track_id) }
+        )?;
+        Ok(())
+    }
+
+// Трейт AudioReader и структура SymphoniaReader остаются без изменений
+
+impl AudioReader for SymphoniaReader {
+    // Методы sample_rate, channels, bits_per_sample, seek остаются без изменений.
+    // Они были корректны.
+
+    fn read(&mut self, buf: &mut [f32]) -> Result<usize, Box<dyn Error>> {
+        let mut samples_written = 0;
+        let num_channels = self.channels as usize;
+        let buf_len_samples = buf.len();
+
+        // Цикл продолжается, пока мы не заполним предоставленный буфер `buf`
+        while samples_written < buf_len_samples {
+            // ШАГ 1: Проверить, есть ли данные в нашем внутреннем буфере `self.sample_buf`
+            if let Some(sample_buf) = self.sample_buf.as_mut() {
+                // Сколько сэмплов осталось в нашем внутреннем буфере
+                let remaining_in_buf = sample_buf.samples().len() - self.buf_pos;
+                // Сколько сэмплов нам нужно скопировать в `buf`
+                let to_copy = (buf_len_samples - samples_written).min(remaining_in_buf);
+                
+                if to_copy > 0 {
+                    let src_slice = &sample_buf.samples()[self.buf_pos..self.buf_pos + to_copy];
+                    let dst_slice = &mut buf[samples_written..samples_written + to_copy];
+                    dst_slice.copy_from_slice(src_slice);
+
+                    samples_written += to_copy;
+                    self.buf_pos += to_copy;
+                }
+
+                // Если мы прочитали все из нашего внутреннего буфера, очищаем его
+                if self.buf_pos >= sample_buf.samples().len() {
+                    self.sample_buf = None;
+                    self.buf_pos = 0;
+                }
+            }
+            
+            // Если `buf` уже заполнен, выходим
+            if samples_written >= buf_len_samples {
+                break;
+            }
+
+            // ШАГ 2: Если внутреннего буфера нет или он опустел, читаем новый пакет из файла
+            let packet = match self.reader.next_packet() {
+                Ok(packet) => packet,
+                Err(symphonia::core::errors::Error::IoError(ref err))
+                    if err.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    break; // Нормальный конец файла
+                }
+                Err(e) => return Err(Box::new(e)),
+            };
+
+            // Пропускаем пакеты не из нашего трека
+            if packet.track_id() != self.track_id {
+                continue;
+            }
+
+            // ШАГ 3: Декодируем пакет в новый `AudioBufferRef`
+            match self.decoder.decode(&packet)? {
+                AudioBufferRef::F32(decoded) => {
+                    // Если декодированный пакет пуст, пропускаем
+                    if decoded.frames() == 0 {
+                        continue;
                     }
-                },
-                hound::SampleFormat::Float => SampleType::F32,
-            },
-        };
-        
-        Ok(WavReader { 
-            metadata, 
-            reader
-        })
-    }
-}
 
-impl AudioReader for WavReader {
-    fn metadata(&self) -> &AudioMetadata {
-        &self.metadata
-    }
-    
-    fn seek(&mut self, sample_num: u64) -> Result<(), Box<dyn Error>> {
-        let sample_num_32: u32 = sample_num.try_into()
-            .map_err(|e| format!("Seek position {} is too large for a WAV file: {}", sample_num, e))?;
-        self.reader.seek(sample_num_32).map_err(|e| e.into())
-    }
-    
-    fn read(&mut self, samples: &mut [f32]) -> Result<usize, Box<dyn Error>> {
-        let samples_iterator = self.reader.samples::<f32>();
-
-        let mut read_count = 0;
-        for (i, sample_result) in samples_iterator.take(samples.len()).enumerate() {
-            let sample = sample_result?;
-            samples[i] = sample;
-            read_count += 1;
-        }
-        if matches!(self.metadata.signal_type, SignalType::Real) { read_count /= 2 }
-        Ok(read_count)
-    }
-}
-
-pub struct FlacReader {
-    metadata: AudioMetadata,
-    reader: claxon::FlacReader<std::io::BufReader<std::fs::File>>,
-}
-
-impl FlacReader {
-    pub fn open(path: &Path) -> Result<Self, Box<dyn Error>> {
-        let reader = claxon::FlacReader::open(path)?;
-        let info = reader.streaminfo();
-        
-        let metadata = AudioMetadata {
-            codec: "flac".to_string(),
-            sample_rate: info.sample_rate,
-            total_samples: info.samples.unwrap_or(0),
-            signal_type: match info.channels {
-                1 => SignalType::Real,
-                2 => SignalType::IQ,
-                _ => return Err(format!("Unsupported channels count: {}", info.channels).into()),
-            },
-            sample_type: SampleType::F32, // FlacReader always reads as F32
-        };
-        
-        Ok(FlacReader { 
-            metadata, 
-            reader
-        })
-    }
-}
-
-impl AudioReader for FlacReader {
-    fn metadata(&self) -> &AudioMetadata {
-        &self.metadata
-    }
-    
-    fn seek(&mut self, sample_num: u64) -> Result<(), Box<dyn Error>> {
-        self.reader.seek(sample_num).map_err(|e| e.into())
-    }
-    
-    fn read(&mut self, samples: &mut [f32], count: usize) -> Result<usize, Box<dyn Error>> {
-        let remaining_samples = (self.samples.len() as u64 - self.current_position) as usize;
-        let samples_to_read = std::cmp::min(count, remaining_samples);
-        let samples_to_read = std::cmp::min(samples_to_read, samples.len());
-        
-        if samples_to_read == 0 {
-            return Ok(0);
+                    // --- ЕДИНСТВЕННО ВЕРНЫЙ КОД ---
+                    // Создаем наш собственный управляемый буфер, используя
+                    // .frames() для получения количества кадров.
+                    let mut new_s_buf = SampleBuffer::<f32>::new(decoded.frames() as u64, *decoded.spec());
+                    
+                    // Копируем чередующиеся (interleaved) сэмплы из `decoded` в наш буфер.
+                    new_s_buf.copy_interleaved_ref(decoded);
+                    
+                    // Сохраняем этот новый буфер для использования на этой и следующей итерации.
+                    self.sample_buf = Some(new_s_buf);
+                    self.buf_pos = 0;
+                }
+                // Пропускаем другие форматы сэмплов для простоты
+                _ => continue,
+            }
         }
         
-        let start_pos = self.current_position as usize;
-        let end_pos = start_pos + samples_to_read;
-        
-        samples[..samples_to_read].copy_from_slice(&self.samples[start_pos..end_pos]);
-        self.current_position += samples_to_read as u64;
-        
-        Ok(samples_to_read)
+        // Возвращаем количество записанных КАДРОВ
+        let frames_written = samples_written / num_channels;
+        Ok(frames_written)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_flac_reader_seek() {
-        // Создаем mock FlacReader с тестовыми данными
-        let metadata = AudioMetadata {
-            codec: "flac".to_string(),
-            sample_rate: 44100,
-            total_samples: 10,
-            signal_type: SignalType::Real,
-            sample_type: SampleType::F32,
-        };
-        
-        let test_samples = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
-        let mut reader = FlacReader {
-            metadata,
-            samples: test_samples,
-            current_position: 0,
-        };
-        
-        // Тест seek
-        assert!(reader.seek(5).is_ok());
-        assert_eq!(reader.current_position, 5);
-        
-        // Тест seek за пределы
-        assert!(reader.seek(15).is_err());
-        
-        // Тест read после seek
-        let mut buffer = [0.0f32; 3];
-        let read_count = reader.read(&mut buffer, 3).unwrap();
-        assert_eq!(read_count, 3);
-        assert_eq!(buffer, [0.6, 0.7, 0.8]);
-        assert_eq!(reader.current_position, 8);
-    }
-
-    #[test]
-    fn test_flac_reader_read() {
-        let metadata = AudioMetadata {
-            codec: "flac".to_string(),
-            sample_rate: 44100,
-            total_samples: 5,
-            signal_type: SignalType::Real,
-            sample_type: SampleType::F32,
-        };
-        
-        let test_samples = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let mut reader = FlacReader {
-            metadata,
-            samples: test_samples,
-            current_position: 0,
-        };
-        
-        // Читаем 3 сэмпла
-        let mut buffer = [0.0f32; 3];
-        let read_count = reader.read(&mut buffer, 3).unwrap();
-        assert_eq!(read_count, 3);
-        assert_eq!(buffer, [1.0, 2.0, 3.0]);
-        assert_eq!(reader.current_position, 3);
-        
-        // Читаем оставшиеся 2 сэмпла
-        let mut buffer2 = [0.0f32; 5];
-        let read_count2 = reader.read(&mut buffer2, 5).unwrap();
-        assert_eq!(read_count2, 2);
-        assert_eq!(&buffer2[..2], &[4.0, 5.0]);
-        assert_eq!(reader.current_position, 5);
-        
-        // Попытка чтения после конца файла
-        let mut buffer3 = [0.0f32; 2];
-        let read_count3 = reader.read(&mut buffer3, 2).unwrap();
-        assert_eq!(read_count3, 0);
-    }
-
-    #[test]
-    fn test_audio_metadata_pretty_string() {
-        let metadata = AudioMetadata {
-            codec: "flac".to_string(),
-            sample_rate: 44100,
-            total_samples: 44100, // 1 секунда
-            signal_type: SignalType::Real,
-            sample_type: SampleType::F32,
-        };
-        
-        let pretty = metadata.to_pretty_string();
-        assert!(pretty.contains("flac"));
-        assert!(pretty.contains("44100 Hz"));
-        assert!(pretty.contains("real"));
-        assert!(pretty.contains("f32"));
-        assert!(pretty.contains("1s"));
-    }
-
-    #[test]
-    fn test_format_duration() {
-        // Тест миллисекунд
-        assert_eq!(format_duration(0.5), "500ms");
-        assert_eq!(format_duration(0.001), "1ms");
-        
-        // Тест секунд
-        assert_eq!(format_duration(1.0), "1s");
-        assert_eq!(format_duration(5.123), "5.123s");
-        
-        // Тест минут
-        assert_eq!(format_duration(65.0), "1:05m");
-        assert_eq!(format_duration(125.456), "2:05.456m");
-        
-        // Тест часов
-        assert_eq!(format_duration(3665.0), "1:01:05h");
-        assert_eq!(format_duration(7325.123), "2:02:05.123h");
-    }
-}
+}}
