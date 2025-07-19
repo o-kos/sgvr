@@ -1,5 +1,3 @@
-// spec-vis/src/main.rs
-
 mod audio;
 mod scalc;
 mod srend;
@@ -104,7 +102,19 @@ fn parse_image_size(s: &str) -> (u32, u32) {
 fn main() {
     let args = Args::parse();
 
-    println!("Process file: '{}'", args.file_name);
+    println!("Process file: '{}'...", args.file_name);
+
+    use std::path::Path;
+    let reader = match audio::create_audio_reader(Path::new(&args.file_name)) {
+        Ok(reader) => reader,
+        Err(e) => {
+            eprintln!("Error opening audio file: {}", e);
+            return;
+        }
+    };
+
+    println!("File info: {}", reader.metadata().to_pretty_string());
+
     let (width, height) = parse_image_size(&args.image_size);
     println!("Generate {}x{}px spec image with color scheme '{:?}'", width, height, args.color_scheme);
     println!(
@@ -128,16 +138,7 @@ fn main() {
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")
         .unwrap()
         .progress_chars("#>-"));
-
-    use std::path::Path;
-    let reader = match audio::create_audio_reader(Path::new(&args.file_name)) {
-        Ok(reader) => reader,
-        Err(e) => {
-            eprintln!("Error opening audio file: {}", e);
-            return;
-        }
-    };
-    
+   
     let spec_data_result = scalc::calculate_spectrogram(reader, params, |processed, total| {
         pb.set_length(total as u64);
         pb.set_position(processed as u64);
