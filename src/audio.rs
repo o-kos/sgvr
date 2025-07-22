@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 
-use symphonia::core::audio::{SampleBuffer, Signal};
+use symphonia::core::audio::{SampleBuffer};
 use symphonia::core::codecs::{Decoder, DecoderOptions};
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
 use symphonia::core::io::MediaSourceStream;
@@ -10,19 +10,10 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::units::TimeBase;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignalType {
     Real,
     IQ
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum SampleType {
-    U8,
-    I16,
-    I24,
-    I32,
-    F32,
 }
 
 #[derive(Debug, Clone)]
@@ -31,42 +22,41 @@ pub struct AudioMetadata {
     pub sample_rate: u32,
     pub total_samples: u64,
     pub signal_type: SignalType,
-    pub sample_type: SampleType,
 }
 
-fn format_duration(duration: f64) -> String {
+pub(crate) fn format_duration(duration: f64) -> String {
     if duration < 0.0 {
         return format!("-{}", format_duration(-duration));
     }
 
     let mut ms = (duration * 1000.0).round() as u64;
     if duration < 1.0 {
-        return format!("{}ms", ms);
+        return format!("{ms}ms");
     }
 
     let sec = ms / 1000;
     ms %= 1000;
     let ms_str = if ms != 0 {
-        format!(".{}", ms).trim_end_matches('0').to_string()
+        format!(".{ms}").trim_end_matches('0').to_string()
     } else {
         String::new()
     };
 
     if sec < 60 {
-        return format!("{}{}s", sec, ms_str);
+        return format!("{sec}{ms_str}s");
     }  
     
     if sec < 3600 {
         let minutes = sec / 60;
         let seconds = sec % 60;
-        return format!("{}:{:02}{}m", minutes, seconds, ms_str);
+        return format!("{minutes}:{seconds:02}{ms_str}m");
     } 
     
     let hours = sec / 3600;
     let remainder = sec % 3600;
     let minutes = remainder / 60;
     let seconds = remainder % 60;
-    format!("{}:{:02}:{:02}{}h", hours, minutes, seconds, ms_str)
+    format!("{hours}:{minutes:02}:{seconds:02}{ms_str}h")
 }
 
 impl AudioMetadata {
@@ -80,13 +70,7 @@ impl AudioMetadata {
                 SignalType::Real => "real",
                 SignalType::IQ => "i/q",
             },
-            match self.sample_type {
-                SampleType::U8 => "u8",
-                SampleType::I16 => "i16",
-                SampleType::I24 => "i24",
-                SampleType::I32 => "i32",
-                SampleType::F32 => "f32",
-            },
+            "i16----",
             format_duration(total_seconds)
         )
     }
@@ -101,34 +85,21 @@ pub trait AudioReader {
 }
 
 pub fn create_audio_reader(path: &Path) -> Result<Box<dyn AudioReader>, Box<dyn Error>> {
-    let extension = path.extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    
-    match extension.as_str() {
-        "wav" | "flac" => {
-            Ok(Box::new(SymphoniaReader::open(path)?))
-        },
-        _ => {
-            match SymphoniaReader::open(path) {
-                Ok(reader) => Ok(Box::new(reader)),
-                Err(_) => Err(format!("Unsupported audio format: '{}' from path {:?}", extension, path).into()),
-            }
-        },
+    match SymphoniaReader::open(path) {
+        Ok(reader) => Ok(Box::new(reader)),
+        Err(e) => Err(format!("Failed to create audio reader: {e}").into()),
     }
 }
 
 pub struct SymphoniaReader {
+    metadata: AudioMetadata,
     reader: Box<dyn FormatReader>,
     decoder: Box<dyn Decoder>,
     track_id: u32,
-    sample_rate: u32,
     channels: u16,
     time_base: TimeBase,
     sample_buf: Option<SampleBuffer<f32>>,
     buf_pos: usize,
-    metadata: AudioMetadata,
 }
 
 impl SymphoniaReader {
@@ -141,8 +112,8 @@ impl SymphoniaReader {
         if let Some(extension) = path_ref.extension().and_then(|s| s.to_str()) {
             hint.with_extension(extension);
         }
-        let format_opts = FormatOptions { ..Default::default() };
-        let metadata_opts = MetadataOptions { ..Default::default() };
+        let format_opts: FormatOptions = Default::default();
+        let metadata_opts: MetadataOptions = Default::default();
         let probed = symphonia::default::get_probe()
             .format(&hint, mss, &format_opts, &metadata_opts)?;
 
@@ -152,29 +123,38 @@ impl SymphoniaReader {
         let track_id = track.id;
         let codec_params = track.codec_params.clone();
 
-        let sample_rate = codec_params.sample_rate.ok_or("Missing sample rate")?;
         let channels = codec_params.channels.ok_or("Missing channels")?.count() as u16;
+        let signal_type = match channels {
+            1 => SignalType::Real,
+            2 => SignalType::IQ,
+            _ => return Err(format!("Unsupported channels count: {channels}").into()),
+        };
+        let sample_rate = codec_params.sample_rate.ok_or("Missing sample rate")?;
         let time_base = codec_params.time_base.ok_or("Missing time base")?;
 
         let decoder_opts = DecoderOptions { ..Default::default() };
         let decoder = symphonia::default::get_codecs().make(&codec_params, &decoder_opts)?;
 
         let total_samples = codec_params.n_frames.unwrap_or(0);
-        let codec_name = codec_params.codec.to_string();
-        
+
+        let registry = symphonia::default::get_codecs();
+        let codec_name = registry
+            .get_codec(codec_params.codec)
+            .map(|codec_type| codec_type.short_name)
+            .unwrap_or("Unknown")
+            .to_string();
+
         let metadata = AudioMetadata {
             codec: codec_name,
             sample_rate,
             total_samples,
-            signal_type: SignalType::Real,
-            sample_type: SampleType::F32,
+            signal_type,
         };
 
         Ok(Self {
             reader,
             decoder,
             track_id,
-            sample_rate,
             channels,
             time_base,
             sample_buf: None,
@@ -278,3 +258,4 @@ impl AudioReader for SymphoniaReader {
         Ok(samples)
     }
 }
+

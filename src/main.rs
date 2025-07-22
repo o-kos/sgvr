@@ -2,6 +2,9 @@ mod audio;
 mod scalc;
 mod srend;
 
+#[cfg(test)]
+mod audio_tests;
+
 use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Instant;
@@ -108,7 +111,7 @@ fn main() {
     let reader = match audio::create_audio_reader(Path::new(&args.file_name)) {
         Ok(reader) => reader,
         Err(e) => {
-            eprintln!("Error opening audio file: {}", e);
+            eprintln!("Error opening audio file: {e}");
             return;
         }
     };
@@ -149,7 +152,7 @@ fn main() {
     let spec_data = match spec_data_result {
         Ok(data) => data,
         Err(e) => {
-            eprintln!("Error calculating spectrogram: {}", e);
+            eprintln!("Error calculating spectrogram: {e}");
             return;
         }
     };
@@ -165,11 +168,8 @@ fn main() {
     println!("\nSaving file...");
     let output_path = format!("{}.png", args.file_name);
     match image.save(&output_path) {
-        Ok(_) => println!(
-            "  Image successfully saved to {}",
-            output_path
-        ),
-        Err(e) => eprintln!("  Error saving image: {}", e),
+        Ok(_)  => println!("  Image successfully saved to {output_path}"),
+        Err(e) => eprintln!("  Error saving image: {e}"),
     }
 
     println!("\nCompleted.");

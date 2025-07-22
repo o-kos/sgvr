@@ -11,7 +11,3 @@ clap = { version = "4.5", features = ["derive"] }
 indicatif = "0.17"
 hsl = "0.1.1"
 symphonia = "0.5.4"
-
-[[bin]]
-name = "gen_test_wav"
-path = "tools/gen_test_wav.rs"
