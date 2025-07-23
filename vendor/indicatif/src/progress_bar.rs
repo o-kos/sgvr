@@ -156,8 +156,12 @@ impl ProgressBar {
     /// Overrides the stored style
     ///
     /// This does not redraw the bar. Call [`ProgressBar::tick()`] to force it.
-    pub fn set_style(&self, style: ProgressStyle) {
-        self.state().set_style(style);
+    pub fn set_style(&self, mut style: ProgressStyle) {
+        let mut state = self.state();
+        if state.draw_target.is_stderr() {
+            style.set_for_stderr()
+        };
+        state.set_style(style);
     }
 
     /// Sets the tab width (default: 8). All tabs will be expanded to this many spaces.
@@ -421,6 +425,17 @@ impl ProgressBar {
         let mut state = self.state();
         state.draw_target.disconnect(Instant::now());
         state.draw_target = target;
+    }
+
+    /// Force a redraw of the progress bar to be in sync with its state
+    ///
+    /// For performance reasons the progress bar is not redrawn on each state update.
+    /// This is normally not an issue, since new updates will eventually trigger rendering.
+    ///
+    /// For slow running tasks it is recommended to rely on [`ProgressBar::enable_steady_tick()`]
+    /// to ensure continued rendering of the progress bar.
+    pub fn force_draw(&self) {
+        let _ = self.state().draw(true, Instant::now());
     }
 
     /// Hide the progress bar temporarily, execute `f`, then redraw the progress bar

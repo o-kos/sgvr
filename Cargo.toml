@@ -5,9 +5,9 @@ edition = "2024"
 default-run = "sgvr"
 
 [dependencies]
-rustfft = "6.2"
+rustfft = "6.4"
 image = "0.25"
 clap = { version = "4.5", features = ["derive"] }
-indicatif = "0.17"
+indicatif = "0.18.0"
 hsl = "0.1.1"
 symphonia = "0.5.4"

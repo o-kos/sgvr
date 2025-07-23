@@ -1,14 +1,13 @@
-use std::cmp;
+use core::fmt::Display;
+use core::iter::once;
+use core::mem::{self, MaybeUninit};
+use core::{char, cmp};
 use std::env;
 use std::ffi::OsStr;
-use std::fmt::Display;
 use std::io;
-use std::iter::once;
-use std::mem;
 use std::os::raw::c_void;
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::io::AsRawHandle;
-use std::{char, mem::MaybeUninit};
 
 use encode_unicode::error::Utf16TupleError;
 use encode_unicode::CharExt;
@@ -67,6 +66,9 @@ pub(crate) fn is_a_terminal(out: &Term) -> bool {
 
 pub(crate) fn is_a_color_terminal(out: &Term) -> bool {
     if !is_a_terminal(out) {
+        return false;
+    }
+    if env::var("NO_COLOR").is_ok() {
         return false;
     }
     if msys_tty_on(out) {
@@ -467,8 +469,7 @@ pub(crate) fn read_single_key(ctrlc_key: bool) -> io::Result<Key> {
                     // (This error is given when reading a non-UTF8 file into a String, for example.)
                     Err(e) => {
                         let message = format!(
-                            "Read invalid surrogate pair ({}, {}): {}",
-                            unicode_char, next_surrogate, e
+                            "Read invalid surrogate pair ({unicode_char}, {next_surrogate}): {e}",
                         );
                         Err(io::Error::new(io::ErrorKind::InvalidData, message))
                     }
@@ -478,7 +479,7 @@ pub(crate) fn read_single_key(ctrlc_key: bool) -> io::Result<Key> {
             // Return an InvalidData error. This is the recommended value for UTF-related I/O errors.
             // (This error is given when reading a non-UTF8 file into a String, for example.)
             Err(e) => {
-                let message = format!("Read invalid utf16 {}: {}", unicode_char, e);
+                let message = format!("Read invalid utf16 {unicode_char}: {e}");
                 Err(io::Error::new(io::ErrorKind::InvalidData, message))
             }
         }
@@ -587,7 +588,7 @@ pub(crate) fn msys_tty_on(term: &Term) -> bool {
             handle as HANDLE,
             FileNameInfo,
             &mut name_info as *mut _ as *mut c_void,
-            std::mem::size_of::<FILE_NAME_INFO>() as u32,
+            mem::size_of::<FILE_NAME_INFO>() as u32,
         );
         if res == 0 {
             return false;
@@ -613,7 +614,7 @@ pub(crate) fn msys_tty_on(term: &Term) -> bool {
 }
 
 pub(crate) fn set_title<T: Display>(title: T) {
-    let buffer: Vec<u16> = OsStr::new(&format!("{}", title))
+    let buffer: Vec<u16> = OsStr::new(&format!("{title}"))
         .encode_wide()
         .chain(once(0))
         .collect();
