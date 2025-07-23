@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
     <option name="buildProfileId" value="test" />
-    <option name="command" value="run --bin sgvr -- tests/HFDL-1460.wav" />
+    <option name="command" value="run --bin sgvr -- tests/rl_16x8_hfdl.wav" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs />
     <option name="emulateTerminal" value="true" />

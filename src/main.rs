@@ -168,7 +168,7 @@ fn main() {
     println!("\nSaving file...");
     let output_path = format!("{}.png", args.file_name);
     match image.save(&output_path) {
-        Ok(_)  => println!("  Image successfully saved to {output_path}"),
+        Ok(_)  => println!("  Image successfully saved to '{output_path}'"),
         Err(e) => eprintln!("  Error saving image: {e}"),
     }
 

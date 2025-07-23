@@ -1,6 +1,8 @@
 use std::error::Error;
+use std::fmt::Debug;
 use std::fs::File;
 use std::path::Path;
+
 
 use symphonia::core::audio::{SampleBuffer};
 use symphonia::core::codecs::{Decoder, DecoderOptions};
@@ -22,6 +24,26 @@ pub struct AudioMetadata {
     pub sample_rate: u32,
     pub total_samples: u64,
     pub signal_type: SignalType,
+}
+
+pub(crate) fn format_samples(num_samples: u64) -> String {
+    if num_samples < 1000 {
+        return format!("{num_samples}spl");
+    }
+
+    let value = num_samples as f64;
+    
+    if value < 1_000_000.0 {
+        return format!("{:.1}kspl", value / 1_000.0);
+    }
+    if value < 1_000_000_000.0 {
+        return format!("{:.1}Mspl", value / 1_000_000.0);
+    }  
+    if value < 1_000_000_000_000.0 {
+        format!("{:.1}Gspl", value / 1_000_000_000.0)
+    } else {
+        format!("{:.1}Tspl", value / 1_000_000_000_000.0)
+    }
 }
 
 pub(crate) fn format_duration(duration: f64) -> String {
@@ -49,29 +71,29 @@ pub(crate) fn format_duration(duration: f64) -> String {
     if sec < 3600 {
         let minutes = sec / 60;
         let seconds = sec % 60;
-        return format!("{minutes}:{seconds:02}{ms_str}m");
+        return format!("{minutes}m{seconds:02}{ms_str}s");
     } 
     
     let hours = sec / 3600;
     let remainder = sec % 3600;
     let minutes = remainder / 60;
     let seconds = remainder % 60;
-    format!("{hours}:{minutes:02}:{seconds:02}{ms_str}h")
+    format!("{hours}h{minutes:02}m{seconds:02}{ms_str}s")
 }
 
 impl AudioMetadata {
     pub fn to_pretty_string(&self) -> String {
         let total_seconds = self.total_samples as f64 / self.sample_rate as f64;
         format!(
-            "'{}', {} Hz, {} {}, {}",
+            "'{}', {} Hz, {}, {} ({})",
             self.codec,
             self.sample_rate,
             match self.signal_type {
                 SignalType::Real => "real",
                 SignalType::IQ => "i/q",
             },
-            "i16----",
-            format_duration(total_seconds)
+            format_duration(total_seconds),
+            format_samples(self.total_samples)
         )
     }
 }
@@ -87,7 +109,7 @@ pub trait AudioReader {
 pub fn create_audio_reader(path: &Path) -> Result<Box<dyn AudioReader>, Box<dyn Error>> {
     match SymphoniaReader::open(path) {
         Ok(reader) => Ok(Box::new(reader)),
-        Err(e) => Err(format!("Failed to create audio reader: {e}").into()),
+        Err(e) => Err(e),
     }
 }
 
@@ -258,4 +280,6 @@ impl AudioReader for SymphoniaReader {
         Ok(samples)
     }
 }
+
+
 

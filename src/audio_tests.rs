@@ -2,38 +2,61 @@ use super::audio::*;
 use std::path::PathBuf;
 
 #[test]
-fn test_format_duration_milliseconds() {
+fn test_format_samples() {
+    // Small numbers
+    assert_eq!(format_samples(0), "0spl");
+    assert_eq!(format_samples(500), "500spl");
+    assert_eq!(format_samples(999), "999spl");
+    
+    // Thousands
+    assert_eq!(format_samples(1000), "1.0kspl");
+    assert_eq!(format_samples(1500), "1.5kspl");
+    assert_eq!(format_samples(12345), "12.3kspl");
+    assert_eq!(format_samples(999999), "1000.0kspl");
+    
+    // Millions
+    assert_eq!(format_samples(1_000_000), "1.0Mspl");
+    assert_eq!(format_samples(1_500_000), "1.5Mspl");
+    assert_eq!(format_samples(12_345_678), "12.3Mspl");
+    assert_eq!(format_samples(999_999_999), "1000.0Mspl");
+    
+    // Billions
+    assert_eq!(format_samples(1_000_000_000), "1.0Gspl");
+    assert_eq!(format_samples(1_500_000_000), "1.5Gspl");
+    assert_eq!(format_samples(12_345_678_901), "12.3Gspl");
+    assert_eq!(format_samples(999_999_999_999), "1000.0Gspl");
+    
+    // Trillions
+    assert_eq!(format_samples(1_000_000_000_000), "1.0Tspl");
+    assert_eq!(format_samples(1_500_000_000_000), "1.5Tspl");
+    assert_eq!(format_samples(12_345_678_901_234), "12.3Tspl");
+}
+
+#[test]
+fn test_format_duration() {
     assert_eq!(format_duration(0.0), "0ms");
     assert_eq!(format_duration(0.001), "1ms");
     assert_eq!(format_duration(0.123), "123ms");
     assert_eq!(format_duration(0.999), "999ms");
-}
 
-#[test]
-fn test_format_duration_seconds() {
     assert_eq!(format_duration(1.0), "1s");
     assert_eq!(format_duration(1.5), "1.5s");
     assert_eq!(format_duration(12.34), "12.34s");
     assert_eq!(format_duration(59.999), "59.999s");
-}
 
-#[test]
-fn test_format_duration_minutes() {
-    assert_eq!(format_duration(60.0), "1:00m");
+    assert_eq!(format_duration(60.0), "1m");
+    assert_eq!(format_duration(60.1), "1m:00.1s");
     assert_eq!(format_duration(61.5), "1:01.5m");
     assert_eq!(format_duration(125.75), "2:05.75m");
     assert_eq!(format_duration(3599.999), "59:59.999m");
-}
 
-#[test]
-fn test_format_duration_hours() {
-    assert_eq!(format_duration(3600.0), "1:00:00h");
+    assert_eq!(format_duration(3600.0), "1h");
+    assert_eq!(format_duration(3600.1), "1h:00.1s");
+    assert_eq!(format_duration(3660.0), "1h:01m");
+    assert_eq!(format_duration(3660.1), "1h:01m:00.1s");
     assert_eq!(format_duration(3661.5), "1:01:01.5h");
     assert_eq!(format_duration(7323.25), "2:02:03.25h");
-}
 
-#[test]
-fn test_format_duration_negative() {
     assert_eq!(format_duration(-1.5), "-1.5s");
     assert_eq!(format_duration(-60.0), "-1:00m");
     assert_eq!(format_duration(-3600.0), "-1:00:00h");
@@ -105,7 +128,7 @@ fn test_symphonia_reader_with_wav_file() {
 
 #[test]
 fn test_symphonia_reader_with_flac_file() {
-    let test_file = PathBuf::from("tests/rl_f32_hfdl.flac");
+    let test_file = PathBuf::from("tests/rl_f32-hfdl.flac");
     if !test_file.exists() {
         return;
     }
@@ -138,14 +161,14 @@ fn test_audio_metadata_table() {
             expected_signal_type: SignalType::Real,
         },
         TestCase {
-            filename: "rl_f32_hfdl.flac",
+            filename: "rl_f32-hfdl.flac",
             expected_codec: "flac",
             expected_sample_rate: 12600,
             expected_total_samples: 63000,
             expected_signal_type: SignalType::Real,
         },
         TestCase {
-            filename: "iq_f32_ft8.flac",
+            filename: "iq_f32-ft8.flac",
             expected_codec: "flac",
             expected_sample_rate: 62500,
             expected_total_samples: 10238976,
