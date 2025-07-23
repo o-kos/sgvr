@@ -43,6 +43,7 @@ Thumbs.db
 /*.flac
 /*.wavs
 /*.iqw
+/tests/*.png
 
 # Vendor directory override - must be last to override all previous rules
 !vendor/**
