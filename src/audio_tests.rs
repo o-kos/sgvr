@@ -9,25 +9,25 @@ fn test_format_samples() {
     assert_eq!(format_samples(999), "999spl");
     
     // Thousands
-    assert_eq!(format_samples(1000), "1.0kspl");
+    assert_eq!(format_samples(1000), "1kspl");
     assert_eq!(format_samples(1500), "1.5kspl");
     assert_eq!(format_samples(12345), "12.3kspl");
-    assert_eq!(format_samples(999999), "1000.0kspl");
+    assert_eq!(format_samples(999999), "999.999kspl");
     
     // Millions
-    assert_eq!(format_samples(1_000_000), "1.0Mspl");
+    assert_eq!(format_samples(1_000_000), "1Mspl");
     assert_eq!(format_samples(1_500_000), "1.5Mspl");
     assert_eq!(format_samples(12_345_678), "12.3Mspl");
-    assert_eq!(format_samples(999_999_999), "1000.0Mspl");
+    assert_eq!(format_samples(999_999_999), "1Gspl");
     
     // Billions
-    assert_eq!(format_samples(1_000_000_000), "1.0Gspl");
+    assert_eq!(format_samples(1_000_000_000), "1Gspl");
     assert_eq!(format_samples(1_500_000_000), "1.5Gspl");
     assert_eq!(format_samples(12_345_678_901), "12.3Gspl");
-    assert_eq!(format_samples(999_999_999_999), "1000.0Gspl");
+    assert_eq!(format_samples(999_999_999_999), "1Tspl");
     
     // Trillions
-    assert_eq!(format_samples(1_000_000_000_000), "1.0Tspl");
+    assert_eq!(format_samples(1_000_000_000_000), "1Tspl");
     assert_eq!(format_samples(1_500_000_000_000), "1.5Tspl");
     assert_eq!(format_samples(12_345_678_901_234), "12.3Tspl");
 }
@@ -77,10 +77,7 @@ fn test_audio_metadata_to_pretty_string() {
         signal_type: SignalType::Real,
     };
     let result = metadata.to_pretty_string();
-    assert!(result.contains("'PCM'"));
-    assert!(result.contains("44100 Hz"));
-    assert!(result.contains("real"));
-    assert!(result.contains("1s"));
+    assert_eq!(result, "'PCM', 44100 Hz, real, 1s (44.1kspl)");
 }
 
 #[test]
@@ -92,10 +89,7 @@ fn test_audio_metadata_to_pretty_string_iq() {
         signal_type: SignalType::IQ,
     };
     let result = metadata.to_pretty_string();
-    assert!(result.contains("'FLAC'"));
-    assert!(result.contains("8000 Hz"));
-    assert!(result.contains("i/q"));
-    assert!(result.contains("2s"));
+    assert_eq!(result, "'FLAC', 8000 Hz, i/q, 2s (16.0kspl)");
 }
 
 #[test]
@@ -189,11 +183,11 @@ fn test_audio_metadata_table() {
             expected_signal_type: SignalType::Real,
         },
     ];
-    let path = PathBuf::from("tests");
+    let tests_path = PathBuf::from("tests");
     for case in cases {
-        let file_path = path.join(case.filename);
-        assert!(file_path.exists(), "Test file not found: {} (skipped)", file_path.display());
-        let reader = SymphoniaReader::open(&file_path).expect("Failed to open file");
+        let path = tests_path.join(case.filename);
+        assert!(path.exists(), "Test file not found: {}", path.display());
+        let reader = SymphoniaReader::open(&path).expect("Failed to open file: {path.display}");
         let metadata = reader.metadata();
         assert_eq!(metadata.codec.to_lowercase(), case.expected_codec.to_lowercase(),
            "Codec mismatch for {:?}", case.filename);
@@ -207,44 +201,80 @@ fn test_audio_metadata_table() {
 }
 
 #[test]
-fn test_read_samples_method() {
-    let test_file = PathBuf::from("tests/HFDL-1460.wav");
-    if !test_file.exists() {
-        return;
+fn test_sample_reading_table() {
+    struct TestCase {
+        filename: &'static str,
+        samples_0: [f32; 4],
+        samples_1: [f32; 4],
+        offset: u64,
     }
 
-    let mut reader = SymphoniaReader::open(&test_file).unwrap();
-    let samples_result = reader.read_samples();
-    assert!(samples_result.is_ok());
-    
-    let samples = samples_result.unwrap();
-    assert!(!samples.is_empty());
-}
+    let test_cases = vec![
+        TestCase {
+            filename: "rl_16x8-hfdl.wav", //"rl_i16-hfdl.wav",
+            samples_0: [-0.00009155273, -0.00015258789, -0.000030517578, 0.00003051758],
+            samples_1: [ 0.00012207031,  0.0001220703,   6.1035156e-5,   0.00012207031],
+            offset: 50400,
+        },
+        TestCase {
+            filename: "rl_f32-hfdl.flac",
+            samples_0: [-3.0000001e-6, -5.0000003e-6, -1.0000001e-6, 1.0000001e-6],
+            samples_1: [ 4.0000003e-6,  4.0000003e-6,  2.0000001e-6, 4.0000003e-6],
+            offset: 50400,
+        },
+        TestCase {
+            filename: "rl_f32-hfdl.wav",
+            samples_0: [-3.0000001e-6, -5.0000003e-6, -1.0000001e-6, 1.0000001e-6],
+            samples_1: [ 4.0000003e-6,  4.0000003e-6,  2.0000001e-6, 4.0000003e-6],
+            offset: 50400,
+        },
+        TestCase {
+            filename: "iq_f32-ft8.flac",
+            samples_0: [-3.0000001e-6, -5.0000003e-6, -1.0000001e-6, 1.0000001e-6],
+            samples_1: [ 4.0000003e-6,  4.0000003e-6,  2.0000001e-6, 4.0000003e-6],
+            offset: 50400,
+        },
+        TestCase {
+            filename: "iq_i16-hfdl.iqw.wav",
+            samples_0: [-3.0000001e-6, -5.0000003e-6, -1.0000001e-6, 1.0000001e-6],
+            samples_1: [ 4.0000003e-6,  4.0000003e-6,  2.0000001e-6, 4.0000003e-6],
+            offset: 50400,
+        },
+    ];
 
-#[test]
-fn test_create_audio_reader_with_valid_file() {
-    let test_file = PathBuf::from("tests/HFDL-1460.wav");
-    if !test_file.exists() {
-        return;
-    }
-
-    let reader = create_audio_reader(&test_file);
-    assert!(reader.is_ok());
-    
-    let reader = reader.unwrap();
-    let metadata = reader.metadata();
-    assert!(metadata.sample_rate > 0);
-    assert!(metadata.total_samples > 0);
-}
-
-#[test]
-fn test_signal_type_from_channels() {
-    let test_file_mono = PathBuf::from("tests/HFDL-1460.wav");
-    if test_file_mono.exists() {
-        let reader = SymphoniaReader::open(&test_file_mono).unwrap();
-        let metadata = reader.metadata();
-        match metadata.signal_type {
-            SignalType::Real | SignalType::IQ => {},
+    let tests_path = PathBuf::from("tests");
+    for test_case in test_cases {
+        let path = tests_path.join(test_case.filename);
+        assert!(path.exists(), "Test file not found: {}", path.display());
+        let mut reader = SymphoniaReader::open(&path).expect("Failed to open file: {path.display}");
+        
+        // Test first 4 samples at position 0
+        reader.seek(0).expect("Failed to seek to beginning");
+        let mut samples_0 = vec![0.0f32; 4];
+        let count = reader.read(&mut samples_0).expect("Failed to read first samples");
+        assert_eq!(count, 4, 
+            "Read count samples from beginning for {} mismatch: expected 4, got {count}", path.display());
+        
+        for (i, &expected) in test_case.samples_0.iter().enumerate() {
+            assert!((samples_0[i] - expected).abs() < 1e-8, 
+                "Sample {} at position {} mismatch in {}: expected {}, got {}", 
+                i, i, path.display(), expected, samples_0[i]);
         }
+
+        // Test last second samples at specified position
+        reader.seek(test_case.offset).expect("Failed to seek to second position");
+        let mut samples_1 = vec![0.0f32; 4];
+        let count = reader.read(&mut samples_1).expect("Failed to read second position samples");
+        assert_eq!(count, 4, 
+            "Read count samples from second position for {} mismatch: expected 4, got {count}", path.display());
+        
+        for (i, &expected) in test_case.samples_1.iter().enumerate() {
+            assert!((samples_1[i] - expected).abs() < 1e-8,
+                "Sample {} at position {} mismatch in {}: expected {}, got {}",
+                i, test_case.offset + i as u64, path.display(), expected, samples_1[i]);
+        }
+
+        println!("✓ Sample reading test passed for '{}' on positions 0 and {})", 
+                 test_case.filename, test_case.offset);
     }
 }
