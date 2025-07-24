@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::path::Path;
 
-
 use symphonia::core::audio::{SampleBuffer};
 use symphonia::core::codecs::{Decoder, DecoderOptions};
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
@@ -34,15 +33,49 @@ pub(crate) fn format_samples(num_samples: u64) -> String {
     let value = num_samples as f64;
     
     if value < 1_000_000.0 {
-        return format!("{:.1}kspl", value / 1_000.0);
+        let k_value = value / 1_000.0;
+        // Round to 1 decimal place
+        let rounded = (k_value * 10.0).round() / 10.0;
+        if rounded >= 1000.0 {
+            return "1Mspl".to_string();
+        }
+        if rounded.fract() == 0.0 {
+            return format!("{}kspl", rounded as u64);
+        }
+        return format!("{rounded:.1}kspl");
     }
     if value < 1_000_000_000.0 {
-        return format!("{:.1}Mspl", value / 1_000_000.0);
+        let m_value = value / 1_000_000.0;
+        // Round to 1 decimal place
+        let rounded = (m_value * 10.0).round() / 10.0;
+        if rounded >= 1000.0 {
+            return "1Gspl".to_string();
+        }
+        if rounded.fract() == 0.0 {
+            return format!("{}Mspl", rounded as u64);
+        }
+        return format!("{rounded:.1}Mspl");
     }  
     if value < 1_000_000_000_000.0 {
-        format!("{:.1}Gspl", value / 1_000_000_000.0)
+        let g_value = value / 1_000_000_000.0;
+        // Round to 1 decimal place
+        let rounded = (g_value * 10.0).round() / 10.0;
+        if rounded >= 1000.0 {
+            return "1Tspl".to_string();
+        }
+        if rounded.fract() == 0.0 {
+            return format!("{}Gspl", rounded as u64);
+        }
+        format!("{rounded:.1}Gspl")
     } else {
-        format!("{:.1}Tspl", value / 1_000_000_000_000.0)
+        let t_value = value / 1_000_000_000_000.0;
+        // Round to 1 decimal place
+        let rounded = (t_value * 10.0).round() / 10.0;
+        if rounded.fract() == 0.0 {
+            format!("{}Tspl", rounded as u64)
+        } else {
+            format!("{rounded:.1}Tspl")
+        }
     }
 }
 
@@ -71,14 +104,23 @@ pub(crate) fn format_duration(duration: f64) -> String {
     if sec < 3600 {
         let minutes = sec / 60;
         let seconds = sec % 60;
-        return format!("{minutes}m{seconds:02}{ms_str}s");
+        if seconds == 0 && ms_str.is_empty() { 
+            return format!("{minutes}m"); 
+        } 
+        return format!("{minutes}m{seconds:02}{ms_str}");
     } 
     
     let hours = sec / 3600;
     let remainder = sec % 3600;
     let minutes = remainder / 60;
     let seconds = remainder % 60;
-    format!("{hours}h{minutes:02}m{seconds:02}{ms_str}s")
+    if minutes == 0 && seconds == 0 && ms_str.is_empty() { 
+        return format!("{hours}h"); 
+    } 
+    if seconds == 0 && ms_str.is_empty() { 
+        return format!("{hours}h{minutes:02}m"); 
+    } 
+    format!("{hours}h{minutes:02}m{seconds:02}{ms_str}")
 }
 
 impl AudioMetadata {

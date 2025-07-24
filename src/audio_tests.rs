@@ -12,24 +12,34 @@ fn test_format_samples() {
     assert_eq!(format_samples(1000), "1kspl");
     assert_eq!(format_samples(1500), "1.5kspl");
     assert_eq!(format_samples(12345), "12.3kspl");
-    assert_eq!(format_samples(999999), "999.999kspl");
+    assert_eq!(format_samples(44100), "44.1kspl");
+    assert_eq!(format_samples(44120), "44.1kspl");
+    assert_eq!(format_samples(44151), "44.2kspl");
+    assert_eq!(format_samples(999999), "1Mspl");
     
     // Millions
     assert_eq!(format_samples(1_000_000), "1Mspl");
     assert_eq!(format_samples(1_500_000), "1.5Mspl");
+    assert_eq!(format_samples(1_510_000), "1.5Mspl");
+    assert_eq!(format_samples(1_550_001), "1.6Mspl");
     assert_eq!(format_samples(12_345_678), "12.3Mspl");
     assert_eq!(format_samples(999_999_999), "1Gspl");
     
     // Billions
     assert_eq!(format_samples(1_000_000_000), "1Gspl");
     assert_eq!(format_samples(1_500_000_000), "1.5Gspl");
+    assert_eq!(format_samples(1_540_000_000), "1.5Gspl");
+    assert_eq!(format_samples(1_550_000_001), "1.6Gspl");
     assert_eq!(format_samples(12_345_678_901), "12.3Gspl");
     assert_eq!(format_samples(999_999_999_999), "1Tspl");
     
     // Trillions
     assert_eq!(format_samples(1_000_000_000_000), "1Tspl");
     assert_eq!(format_samples(1_500_000_000_000), "1.5Tspl");
+    assert_eq!(format_samples(1_540_000_000_000), "1.5Tspl");
+    assert_eq!(format_samples(1_550_000_000_001), "1.6Tspl");
     assert_eq!(format_samples(12_345_678_901_234), "12.3Tspl");
+    assert_eq!(format_samples(1_212_345_678_901_234), "1212.3Tspl");
 }
 
 #[test]
@@ -45,21 +55,22 @@ fn test_format_duration() {
     assert_eq!(format_duration(59.999), "59.999s");
 
     assert_eq!(format_duration(60.0), "1m");
-    assert_eq!(format_duration(60.1), "1m:00.1s");
-    assert_eq!(format_duration(61.5), "1:01.5m");
-    assert_eq!(format_duration(125.75), "2:05.75m");
-    assert_eq!(format_duration(3599.999), "59:59.999m");
+    assert_eq!(format_duration(60.1), "1m00.1");
+    assert_eq!(format_duration(61.5), "1m01.5");
+    assert_eq!(format_duration(125.75), "2m05.75");
+    assert_eq!(format_duration(3599.999), "59m59.999");
 
     assert_eq!(format_duration(3600.0), "1h");
-    assert_eq!(format_duration(3600.1), "1h:00.1s");
-    assert_eq!(format_duration(3660.0), "1h:01m");
-    assert_eq!(format_duration(3660.1), "1h:01m:00.1s");
-    assert_eq!(format_duration(3661.5), "1:01:01.5h");
-    assert_eq!(format_duration(7323.25), "2:02:03.25h");
+    assert_eq!(format_duration(3600.1), "1h00m00.1");
+    assert_eq!(format_duration(3660.0), "1h01m");
+    assert_eq!(format_duration(3660.1), "1h01m00.1");
+    assert_eq!(format_duration(3661.5), "1h01m01.5");
+    assert_eq!(format_duration(3600.0 * 240.0), "240h");
+    assert_eq!(format_duration(3600.0 * 240.0 + 0.1), "240h00m00.1");
 
     assert_eq!(format_duration(-1.5), "-1.5s");
-    assert_eq!(format_duration(-60.0), "-1:00m");
-    assert_eq!(format_duration(-3600.0), "-1:00:00h");
+    assert_eq!(format_duration(-60.0), "-1m");
+    assert_eq!(format_duration(-3600.0), "-1h");
 }
 
 #[test]
@@ -89,7 +100,7 @@ fn test_audio_metadata_to_pretty_string_iq() {
         signal_type: SignalType::IQ,
     };
     let result = metadata.to_pretty_string();
-    assert_eq!(result, "'FLAC', 8000 Hz, i/q, 2s (16.0kspl)");
+    assert_eq!(result, "'FLAC', 8000 Hz, i/q, 2s (16kspl)");
 }
 
 #[test]
@@ -187,7 +198,9 @@ fn test_audio_metadata_table() {
     for case in cases {
         let path = tests_path.join(case.filename);
         assert!(path.exists(), "Test file not found: {}", path.display());
-        let reader = SymphoniaReader::open(&path).expect("Failed to open file: {path.display}");
+        let open_result = SymphoniaReader::open(&path);
+        assert!(open_result.is_ok(), "Failed to open file: {}", path.display());
+        let reader = open_result.unwrap();
         let metadata = reader.metadata();
         assert_eq!(metadata.codec.to_lowercase(), case.expected_codec.to_lowercase(),
            "Codec mismatch for {:?}", case.filename);
@@ -211,15 +224,15 @@ fn test_sample_reading_table() {
 
     let test_cases = vec![
         TestCase {
-            filename: "rl_16x8-hfdl.wav", //"rl_i16-hfdl.wav",
-            samples_0: [-0.00009155273, -0.00015258789, -0.000030517578, 0.00003051758],
-            samples_1: [ 0.00012207031,  0.0001220703,   6.1035156e-5,   0.00012207031],
+            filename: "rl_i16-hfdl.wav",
+            samples_0: [-0.076_110_84, -0.063_842_77, 0.028_442_38,  0.068_939_21],
+            samples_1: [ 0.176_666_26,  0.090_545_65, 0.021_575_93,  0.035_095_21],
             offset: 50400,
         },
         TestCase {
             filename: "rl_f32-hfdl.flac",
-            samples_0: [-3.0000001e-6, -5.0000003e-6, -1.0000001e-6, 1.0000001e-6],
-            samples_1: [ 4.0000003e-6,  4.0000003e-6,  2.0000001e-6, 4.0000003e-6],
+            samples_0: [-0.076_110_84, -0.063_842_77, 0.028_442_38,  0.068_939_21],
+            samples_1: [ 0.176_666_26,  0.090_545_65, 0.021_575_93,  0.035_095_21],
             offset: 50400,
         },
         TestCase {
@@ -246,7 +259,9 @@ fn test_sample_reading_table() {
     for test_case in test_cases {
         let path = tests_path.join(test_case.filename);
         assert!(path.exists(), "Test file not found: {}", path.display());
-        let mut reader = SymphoniaReader::open(&path).expect("Failed to open file: {path.display}");
+        let open_result = SymphoniaReader::open(&path);
+        assert!(open_result.is_ok(), "Failed to open file: {}", path.display());
+        let mut reader = open_result.unwrap();
         
         // Test first 4 samples at position 0
         reader.seek(0).expect("Failed to seek to beginning");
