@@ -1,9 +1,9 @@
-use std::error::Error;
-use std::fmt::Debug;
-use std::fs::File;
-use std::path::Path;
+use std::path::PathBuf;
 
-use symphonia::core::audio::{SampleBuffer};
+// Copy the structs and functions we need
+use std::error::Error;
+use std::fs::File;
+use symphonia::core::audio::SampleBuffer;
 use symphonia::core::codecs::{Decoder, DecoderOptions};
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
 use symphonia::core::io::MediaSourceStream;
@@ -25,136 +25,6 @@ pub struct AudioMetadata {
     pub signal_type: SignalType,
 }
 
-pub(crate) fn format_samples(num_samples: u64) -> String {
-    if num_samples < 1000 {
-        return format!("{num_samples}spl");
-    }
-
-    let value = num_samples as f64;
-    
-    if value < 1_000_000.0 {
-        let k_value = value / 1_000.0;
-        // Round to 1 decimal place
-        let rounded = (k_value * 10.0).round() / 10.0;
-        if rounded >= 1000.0 {
-            return "1Mspl".to_string();
-        }
-        if rounded.fract() == 0.0 {
-            return format!("{}kspl", rounded as u64);
-        }
-        return format!("{rounded:.1}kspl");
-    }
-    if value < 1_000_000_000.0 {
-        let m_value = value / 1_000_000.0;
-        // Round to 1 decimal place
-        let rounded = (m_value * 10.0).round() / 10.0;
-        if rounded >= 1000.0 {
-            return "1Gspl".to_string();
-        }
-        if rounded.fract() == 0.0 {
-            return format!("{}Mspl", rounded as u64);
-        }
-        return format!("{rounded:.1}Mspl");
-    }  
-    if value < 1_000_000_000_000.0 {
-        let g_value = value / 1_000_000_000.0;
-        // Round to 1 decimal place
-        let rounded = (g_value * 10.0).round() / 10.0;
-        if rounded >= 1000.0 {
-            return "1Tspl".to_string();
-        }
-        if rounded.fract() == 0.0 {
-            return format!("{}Gspl", rounded as u64);
-        }
-        format!("{rounded:.1}Gspl")
-    } else {
-        let t_value = value / 1_000_000_000_000.0;
-        // Round to 1 decimal place
-        let rounded = (t_value * 10.0).round() / 10.0;
-        if rounded.fract() == 0.0 {
-            format!("{}Tspl", rounded as u64)
-        } else {
-            format!("{rounded:.1}Tspl")
-        }
-    }
-}
-
-pub(crate) fn format_duration(duration: f64) -> String {
-    if duration < 0.0 {
-        return format!("-{}", format_duration(-duration));
-    }
-
-    let mut ms = (duration * 1000.0).round() as u64;
-    if duration < 1.0 {
-        return format!("{ms}ms");
-    }
-
-    let sec = ms / 1000;
-    ms %= 1000;
-    let ms_str = if ms != 0 {
-        format!(".{ms}").trim_end_matches('0').to_string()
-    } else {
-        String::new()
-    };
-
-    if sec < 60 {
-        return format!("{sec}{ms_str}s");
-    }  
-    
-    if sec < 3600 {
-        let minutes = sec / 60;
-        let seconds = sec % 60;
-        if seconds == 0 && ms_str.is_empty() { 
-            return format!("{minutes}m"); 
-        } 
-        return format!("{minutes}m{seconds:02}{ms_str}");
-    } 
-    
-    let hours = sec / 3600;
-    let remainder = sec % 3600;
-    let minutes = remainder / 60;
-    let seconds = remainder % 60;
-    if minutes == 0 && seconds == 0 && ms_str.is_empty() { 
-        return format!("{hours}h"); 
-    } 
-    if seconds == 0 && ms_str.is_empty() { 
-        return format!("{hours}h{minutes:02}m"); 
-    } 
-    format!("{hours}h{minutes:02}m{seconds:02}{ms_str}")
-}
-
-impl AudioMetadata {
-    pub fn to_pretty_string(&self) -> String {
-        let total_seconds = self.total_samples as f64 / self.sample_rate as f64;
-        format!(
-            "'{}', {} Hz, {}, {} ({})",
-            self.codec,
-            self.sample_rate,
-            match self.signal_type {
-                SignalType::Real => "real",
-                SignalType::IQ => "i/q",
-            },
-            format_duration(total_seconds),
-            format_samples(self.total_samples)
-        )
-    }
-}
-
-pub trait AudioReader {
-    fn metadata(&self) -> &AudioMetadata;
-    
-    fn seek(&mut self, sample_num: u64) -> Result<(), Box<dyn Error>>;
-    fn read(&mut self, samples: &mut [f32]) -> Result<usize, Box<dyn Error>>;
-    fn read_samples(&mut self) -> Result<Vec<f32>, Box<dyn Error>>;
-}
-
-pub fn create_audio_reader(path: &Path) -> Result<Box<dyn AudioReader>, Box<dyn Error>> {
-    match SymphoniaReader::open(path) {
-        Ok(reader) => Ok(Box::new(reader)),
-        Err(e) => Err(e),
-    }
-}
-
 pub struct SymphoniaReader {
     metadata: AudioMetadata,
     reader: Box<dyn FormatReader>,
@@ -167,7 +37,7 @@ pub struct SymphoniaReader {
 }
 
 impl SymphoniaReader {
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, Box<dyn Error>> {
+    pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self, Box<dyn Error>> {
         let path_ref = path.as_ref();
         let src = File::open(path_ref)?;
         let mss = MediaSourceStream::new(Box::new(src), Default::default());
@@ -226,14 +96,8 @@ impl SymphoniaReader {
             metadata,
         })
     }
-}
 
-impl AudioReader for SymphoniaReader {
-    fn metadata(&self) -> &AudioMetadata {
-        &self.metadata
-    }
-
-    fn seek(&mut self, frame_num: u64) -> Result<(), Box<dyn Error>> {
+    pub fn seek(&mut self, frame_num: u64) -> Result<(), Box<dyn Error>> {
         let time = self.time_base.calc_time(frame_num);
         self.reader.seek(
             SeekMode::Accurate,
@@ -244,9 +108,8 @@ impl AudioReader for SymphoniaReader {
         Ok(())
     }
 
-    fn read(&mut self, buf: &mut [f32]) -> Result<usize, Box<dyn Error>> {
+    pub fn read(&mut self, buf: &mut [f32]) -> Result<usize, Box<dyn Error>> {
         let mut samples_written = 0;
-        let num_channels = self.channels as usize;
         let buf_len_samples = buf.len();
 
         while samples_written < buf_len_samples {
@@ -299,28 +162,41 @@ impl AudioReader for SymphoniaReader {
         
         Ok(samples_written)
     }
-
-    fn read_samples(&mut self) -> Result<Vec<f32>, Box<dyn Error>> {
-        let total_samples = self.metadata.total_samples as usize * self.channels as usize;
-        let mut samples = vec![0.0f32; total_samples];
-        let mut pos = 0;
-        
-        while pos < total_samples {
-            let remaining = total_samples - pos;
-            let to_read = remaining.min(8192);
-            let samples_read = self.read(&mut samples[pos..pos + to_read])?;
-            
-            if samples_read == 0 {
-                break;
-            }
-            
-            pos += samples_read;
-        }
-        
-        samples.truncate(pos);
-        Ok(samples)
-    }
 }
 
-
-
+fn main() {
+    let path = PathBuf::from("tests/rl_i16-hfdl.wav");
+    let mut reader = SymphoniaReader::open(&path).unwrap();
+    
+    // Test first 4 samples at position 0
+    reader.seek(0).expect("Failed to seek to beginning");
+    let mut samples_0 = vec![0.0f32; 4];
+    let count = reader.read(&mut samples_0).expect("Failed to read first samples");
+    
+    println!("First 4 samples (count={}):", count);
+    for (i, sample) in samples_0.iter().enumerate() {
+        println!("  samples_0[{}] = {:.8}", i, sample);
+    }
+    
+    println!("Expected:");
+    println!("  samples_0[0] = -0.076110840");
+    println!("  samples_0[1] = -0.063842770");
+    println!("  samples_0[2] = 0.028442380");
+    println!("  samples_0[3] = 0.068939210");
+    
+    // Test samples at offset 50400
+    reader.seek(50400).expect("Failed to seek to offset");
+    let mut samples_1 = vec![0.0f32; 4];
+    let count = reader.read(&mut samples_1).expect("Failed to read offset samples");
+    
+    println!("\nSamples at offset 50400 (count={}):", count);
+    for (i, sample) in samples_1.iter().enumerate() {
+        println!("  samples_1[{}] = {:.8}", i, sample);
+    }
+    
+    println!("Expected:");
+    println!("  samples_1[0] = 0.176666260");
+    println!("  samples_1[1] = 0.090545650");
+    println!("  samples_1[2] = 0.021575930");
+    println!("  samples_1[3] = 0.035095210");
+}
