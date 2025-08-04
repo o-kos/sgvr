@@ -164,6 +164,7 @@ pub struct SymphoniaReader {
     time_base: TimeBase,
     sample_buf: Option<SampleBuffer<f32>>,
     buf_pos: usize,
+    seek_offset: u64, 
 }
 
 impl SymphoniaReader {
@@ -223,6 +224,7 @@ impl SymphoniaReader {
             time_base,
             sample_buf: None,
             buf_pos: 0,
+            seek_offset: 0,
             metadata,
         })
     }
@@ -234,19 +236,35 @@ impl AudioReader for SymphoniaReader {
     }
 
     fn seek(&mut self, frame_num: u64) -> Result<(), Box<dyn Error>> {
-        let time = self.time_base.calc_time(frame_num);
-        self.reader.seek(
+        let required_time = self.time_base.calc_time(frame_num);
+    
+        let seek_result = self.reader.seek(
             SeekMode::Accurate,
-            SeekTo::Time { time, track_id: Some(self.track_id) }
+            SeekTo::Time {
+                time: required_time,
+                track_id: Some(self.track_id),
+            },
         )?;
+    
+        let actual_ts = seek_result.actual_ts;
+        // let required_ts = required_time.ts;
+        let required_ts = self.time_base.calc_timestamp(required_time);
+    
+        if required_ts > actual_ts {
+            self.seek_offset = required_ts - actual_ts;
+        } else {
+            self.seek_offset = 0;
+        }
+
+        self.decoder.reset();
         self.sample_buf = None;
         self.buf_pos = 0;
+    
         Ok(())
     }
 
     fn read(&mut self, buf: &mut [f32]) -> Result<usize, Box<dyn Error>> {
         let mut samples_written = 0;
-        let num_channels = self.channels as usize;
         let buf_len_samples = buf.len();
 
         while samples_written < buf_len_samples {
@@ -294,7 +312,8 @@ impl AudioReader for SymphoniaReader {
             new_s_buf.copy_interleaved_ref(decoded);
             
             self.sample_buf = Some(new_s_buf);
-            self.buf_pos = 0;
+            self.buf_pos = self.seek_offset as usize;
+            self.seek_offset = 0;
         }
         
         Ok(samples_written)

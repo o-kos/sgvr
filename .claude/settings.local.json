@@ -12,7 +12,9 @@
       "Bash(timeout 60s cargo test test_sample_reading_table)",
       "Bash(timeout 120s cargo build)",
       "Bash(timeout 30s cargo test test_sample_reading_table -- --nocapture)",
-      "Bash(./debug_test.sh:*)"
+      "Bash(./debug_test.sh:*)",
+      "Bash(./debug_test)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
