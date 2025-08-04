@@ -318,8 +318,5 @@ fn test_sample_reading_table() {
                 "Sample {} at position {} mismatch in {}: expected {}, got {}",
                 i, test_case.offset + i as u64, path.display(), expected, samples_1[i]);
         }
-
-        println!("✓ Sample reading test passed for '{}' on positions 0 and {})", 
-            test_case.filename, test_case.offset);
     }
 }
