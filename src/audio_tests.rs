@@ -213,6 +213,8 @@ fn test_audio_metadata_table() {
     }
 }
 
+
+
 #[test]
 fn test_sample_reading_table() {
     struct TestCase {
@@ -263,18 +265,51 @@ fn test_sample_reading_table() {
         assert!(open_result.is_ok(), "Failed to open file: {}", path.display());
         let mut reader = open_result.unwrap();
         
-        // Test first 4 samples at position 0
-        reader.seek(0).expect("Failed to seek to beginning");
-        let mut samples_0 = vec![0.0f32; 4];
-        let count = reader.read(&mut samples_0).expect("Failed to read first samples");
-        assert_eq!(count, 4, 
-            "Read count samples from beginning for {} mismatch: expected 4, got {count}", path.display());
-        
-        for (i, &expected) in test_case.samples_0.iter().enumerate() {
-            assert!((samples_0[i] - expected).abs() < 1e-8, 
-                "Sample {} at position {} mismatch in {}: expected {}, got {}", 
-                i, i, path.display(), expected, samples_0[i]);
-        }
+        // Test first 2 samples at position 0
+        let mut samples = vec![0.0f32; 2];
+        let mut i = 0;
+        let mut count = reader.read(&mut samples).expect("Failed to read first samples");
+        assert_eq!(count, 2, 
+            "Read count samples from beginning for {} mismatch: expected 2, got {count}", path.display());
+        let mut expected = test_case.samples_0[i];
+        assert!((samples[i] - expected).abs() < 1e-8, 
+            "File {}: sample at position {} mismatch: expected {}, got {}", 
+            path.display(), i, expected, samples[i]);
+        i += 1;
+        expected = test_case.samples_0[i];
+        assert!((samples[i] - expected).abs() < 1e-8, 
+            "File {}: sample at position {} mismatch: expected {}, got {}", 
+            path.display(), i, expected, samples[i]);
+    
+        // Test sequential read of second 2 samples at position 2
+        count = reader.read(&mut samples).expect("Failed to read third position samples");
+        assert_eq!(count, 2, 
+            "Read count samples from third position for {} mismatch: expected 2, got {count}", path.display());
+        i += 1;
+        expected = test_case.samples_0[i];
+        assert!((samples[0] - expected).abs() < 1e-8, 
+            "File {}: sample at position {} mismatch: expected {}, got {}", 
+            path.display(), i, expected, samples[0]);
+
+        // Test seek to position 1 and read 1 sample
+        reader.seek(1).expect("Failed to seek to second position");
+        count = reader.read(&mut samples).expect("Failed to read second sample");
+        assert_eq!(count, 2, 
+            "Read count samples from second position for {} mismatch: expected 1, got {count}", path.display());
+        i = 1;
+        expected = test_case.samples_0[i];
+        assert!((samples[0] - expected).abs() < 1e-8, 
+            "File {}: sample at position {} mismatch: expected {}, got {}", 
+            path.display(), i, expected, samples[0]);
+
+        // Test read second
+        reader.seek(1).expect("Failed to seek to beginning");
+        let mut samples_01 = vec![0.0f32; 1];
+        let count = reader.read(&mut samples_01).expect("Failed to read second sample");
+        assert_eq!(count, 1,
+            "Read count samples from second for {} mismatch: expected 4, got {count}", path.display());
+        assert_eq!(samples_01[0], -0.063_842_77,
+            "Read count samples from beginning for {} mismatch: expected -0.063_842_77, got {}", path.display(), samples_01[0]);
 
         // Test last second samples at specified position
         reader.seek(test_case.offset).expect("Failed to seek to second position");
