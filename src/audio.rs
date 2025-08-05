@@ -142,8 +142,8 @@ impl AudioMetadata {
 
 pub trait AudioReader {
     fn metadata(&self) -> &AudioMetadata;
-    
-    fn seek(&mut self, sample_num: u64) -> Result<(), Box<dyn Error>>;
+
+    fn seek(&mut self, frame_num: u64) -> Result<(), Box<dyn Error>>;
     fn read(&mut self, samples: &mut [f32]) -> Result<usize, Box<dyn Error>>;
     fn read_samples(&mut self) -> Result<Vec<f32>, Box<dyn Error>>;
 }
@@ -246,15 +246,7 @@ impl AudioReader for SymphoniaReader {
             },
         )?;
     
-        let actual_ts = seek_result.actual_ts;
-        // let required_ts = required_time.ts;
-        let required_ts = self.time_base.calc_timestamp(required_time);
-    
-        if required_ts > actual_ts {
-            self.seek_offset = required_ts - actual_ts;
-        } else {
-            self.seek_offset = 0;
-        }
+        self.seek_offset = (seek_result.required_ts - seek_result.actual_ts) * self.channels as u64;
 
         self.decoder.reset();
         self.sample_buf = None;
@@ -263,9 +255,9 @@ impl AudioReader for SymphoniaReader {
         Ok(())
     }
 
-    fn read(&mut self, buf: &mut [f32]) -> Result<usize, Box<dyn Error>> {
+    fn read(&mut self, samples: &mut [f32]) -> Result<usize, Box<dyn Error>> {
         let mut samples_written = 0;
-        let buf_len_samples = buf.len();
+        let buf_len_samples = samples.len();
 
         while samples_written < buf_len_samples {
             if let Some(sample_buf) = self.sample_buf.as_mut() {
@@ -274,7 +266,7 @@ impl AudioReader for SymphoniaReader {
                 
                 if to_copy > 0 {
                     let src_slice = &sample_buf.samples()[self.buf_pos..self.buf_pos + to_copy];
-                    let dst_slice = &mut buf[samples_written..samples_written + to_copy];
+                    let dst_slice = &mut samples[samples_written..samples_written + to_copy];
                     dst_slice.copy_from_slice(src_slice);
 
                     samples_written += to_copy;

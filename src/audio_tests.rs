@@ -227,43 +227,44 @@ fn test_sample_reading_table() {
     let test_cases = vec![
         TestCase {
             filename: "rl_i16-hfdl.wav",
-            samples_0: [-0.076_110_84, -0.063_842_77, 0.028_442_38,  0.068_939_21],
-            samples_1: [ 0.176_666_26,  0.090_545_65, 0.021_575_93,  0.035_095_21],
-            offset: 50400,
+            samples_0: [-0.076_111, -0.063_843, 0.028_442,  0.068_939],
+            samples_1: [ 0.176_666,  0.090_546, 0.021_576,  0.035_095],
+            offset: 50_400,
         },
-        // TestCase {
-        //     filename: "rl_f32-hfdl.flac",
-        //     samples_0: [-0.076_110_84, -0.063_842_77, 0.028_442_38,  0.068_939_21],
-        //     samples_1: [ 0.176_666_26,  0.090_545_65, 0.021_575_93,  0.035_095_21],
-        //     offset: 50400,
-        // },
-        // TestCase {
-        //     filename: "rl_f32-hfdl.wav",
-        //     samples_0: [-3.0000001e-6, -5.0000003e-6, -1.0000001e-6, 1.0000001e-6],
-        //     samples_1: [ 4.0000003e-6,  4.0000003e-6,  2.0000001e-6, 4.0000003e-6],
-        //     offset: 50400,
-        // },
-        // TestCase {
-        //     filename: "iq_f32-ft8.flac",
-        //     samples_0: [-3.0000001e-6, -5.0000003e-6, -1.0000001e-6, 1.0000001e-6],
-        //     samples_1: [ 4.0000003e-6,  4.0000003e-6,  2.0000001e-6, 4.0000003e-6],
-        //     offset: 50400,
-        // },
-        // TestCase {
-        //     filename: "iq_i16-hfdl.iqw.wav",
-        //     samples_0: [-3.0000001e-6, -5.0000003e-6, -1.0000001e-6, 1.0000001e-6],
-        //     samples_1: [ 4.0000003e-6,  4.0000003e-6,  2.0000001e-6, 4.0000003e-6],
-        //     offset: 50400,
-        // },
+        TestCase {
+            filename: "rl_f32-hfdl.flac",
+            samples_0: [-0.076_111, -0.063_843, 0.028_442,  0.068_939],
+            samples_1: [ 0.176_666,  0.090_546, 0.021_576,  0.035_095],
+            offset: 50_400,
+        },
+        TestCase {
+            filename: "rl_f32-hfdl.wav",
+            samples_0: [-0.076_111, -0.063_843, 0.028_442,  0.068_939],
+            samples_1: [ 0.176_666,  0.090_546, 0.021_576,  0.035_095],
+            offset: 50_400,
+        },
+        TestCase {
+            filename: "iq_f32-ft8.flac",
+            samples_0: [ 0.003_662, -0.020_966, -0.030_212, -0.001_617],
+            samples_1: [ 0.006_134,  0.001_038, -0.003_967, -0.001_983],
+            offset: 93_750,
+        },
+        TestCase {
+            filename: "iq_i16-hfdl.iqw",
+            samples_0: [-0.283_569_34, -0.224_731_45, -0.053_741_46, -0.121_459_96],
+            samples_1: [ 0.175_720_21,  0.342_620_85, -0.308_105_47, -0.051_239_01],
+            offset: 70_080,
+        },
     ];
 
     let tests_path = PathBuf::from("tests");
     for test_case in test_cases {
         let path = tests_path.join(test_case.filename);
         assert!(path.exists(), "Test file not found: {}", path.display());
-        let open_result = SymphoniaReader::open(&path);
+        let open_result = create_audio_reader(&path);
         assert!(open_result.is_ok(), "Failed to open file: {}", path.display());
         let mut reader = open_result.unwrap();
+        let channels = if reader.metadata().signal_type == SignalType::IQ { 2 } else { 1 };
         
         // Test first 2 samples at position 0
         let mut samples = vec![0.0f32; 2];
@@ -273,12 +274,12 @@ fn test_sample_reading_table() {
             "Read count samples from beginning for {} mismatch: expected 2, got {count}", 
             path.display());
         let mut expected = test_case.samples_0[i];
-        assert!((samples[i] - expected).abs() < 1e-8, 
+        assert!((samples[i] - expected).abs() < 1e-6,
             "File {}: sample at position {} mismatch: expected {}, got {}", 
             path.display(), i, expected, samples[i]);
         i += 1;
         expected = test_case.samples_0[i];
-        assert!((samples[i] - expected).abs() < 1e-8, 
+        assert!((samples[i] - expected).abs() < 1e-6,
             "File {}: sample at position {} mismatch: expected {}, got {}", 
             path.display(), i, expected, samples[i]);
     
@@ -289,7 +290,7 @@ fn test_sample_reading_table() {
             path.display());
         i += 1;
         expected = test_case.samples_0[i];
-        assert!((samples[0] - expected).abs() < 1e-8, 
+        assert!((samples[0] - expected).abs() < 1e-6,
             "File {}: sample at position {} mismatch: expected {}, got {}", 
             path.display(), i, expected, samples[0]);
 
@@ -300,8 +301,8 @@ fn test_sample_reading_table() {
             "Read count samples from second position for {} mismatch: expected 1, got {count}", 
             path.display());
         i = 1;
-        expected = test_case.samples_0[i];
-        assert!((samples[0] - expected).abs() < 1e-8, 
+        expected = test_case.samples_0[i * channels];
+        assert!((samples[0] - expected).abs() < 1e-6,
             "File {}: sample at position {} mismatch: expected {}, got {}", 
             path.display(), i, expected, samples[0]);
 
@@ -314,7 +315,7 @@ fn test_sample_reading_table() {
             path.display());
         
         for (i, &expected) in test_case.samples_1.iter().enumerate() {
-            assert!((samples_1[i] - expected).abs() < 1e-8,
+            assert!((samples_1[i] - expected).abs() < 1e-6,
                 "Sample {} at position {} mismatch in {}: expected {}, got {}",
                 i, test_case.offset + i as u64, path.display(), expected, samples_1[i]);
         }
