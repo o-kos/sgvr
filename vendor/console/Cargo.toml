@@ -13,8 +13,7 @@
 edition = "2021"
 rust-version = "1.66"
 name = "console"
-version = "0.15.11"
-authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
+version = "0.16.0"
 build = false
 autolib = false
 autobins = false
@@ -36,10 +35,17 @@ license = "MIT"
 repository = "https://github.com/console-rs/console"
 
 [features]
+alloc = []
 ansi-parsing = []
 default = [
     "unicode-width",
     "ansi-parsing",
+    "std",
+]
+std = [
+    "dep:libc",
+    "dep:once_cell",
+    "alloc",
 ]
 windows-console-colors = ["ansi-parsing"]
 
@@ -50,22 +56,27 @@ path = "src/lib.rs"
 [[example]]
 name = "colors"
 path = "examples/colors.rs"
+required-features = ["std"]
 
 [[example]]
 name = "colors256"
 path = "examples/colors256.rs"
+required-features = ["std"]
 
 [[example]]
 name = "cursor_at"
 path = "examples/cursor_at.rs"
+required-features = ["std"]
 
 [[example]]
 name = "keyboard"
 path = "examples/keyboard.rs"
+required-features = ["std"]
 
 [[example]]
 name = "term"
 path = "examples/term.rs"
+required-features = ["std"]
 
 [[bench]]
 name = "ansi_parser"
@@ -73,9 +84,11 @@ path = "benches/ansi_parser.rs"
 
 [dependencies.libc]
 version = "0.2.99"
+optional = true
 
 [dependencies.once_cell]
 version = "1.8"
+optional = true
 
 [dependencies.unicode-width]
 version = "0.2"
@@ -97,7 +110,7 @@ version = "1.4.2"
 version = "1"
 
 [target."cfg(windows)".dependencies.windows-sys]
-version = "0.59"
+version = "0.60"
 features = [
     "Win32_Foundation",
     "Win32_System_Console",

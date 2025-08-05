@@ -1,10 +1,10 @@
+#[cfg(target_os = "macos")]
+use core::ptr;
+use core::{fmt::Display, mem, str};
 use std::env;
-use std::fmt::Display;
 use std::fs;
 use std::io::{self, BufRead, BufReader};
-use std::mem;
 use std::os::fd::{AsRawFd, RawFd};
-use std::str;
 
 #[cfg(not(target_os = "macos"))]
 use once_cell::sync::Lazy;
@@ -59,7 +59,7 @@ pub(crate) fn terminal_size(out: &Term) -> Option<(u16, u16)> {
         winsize
     };
     if winsize.ws_row > 0 && winsize.ws_col > 0 {
-        Some((winsize.ws_row as u16, winsize.ws_col as u16))
+        Some((winsize.ws_row, winsize.ws_col))
     } else {
         None
     }
@@ -165,7 +165,7 @@ fn select_fd(fd: RawFd, timeout: i32) -> io::Result<bool> {
 
         let mut timeout_val;
         let timeout = if timeout < 0 {
-            std::ptr::null_mut()
+            ptr::null_mut()
         } else {
             timeout_val = libc::timeval {
                 tv_sec: (timeout / 1000) as _,
@@ -179,8 +179,8 @@ fn select_fd(fd: RawFd, timeout: i32) -> io::Result<bool> {
         let ret = libc::select(
             fd + 1,
             &mut read_fd_set,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
             timeout,
         );
         if ret < 0 {
@@ -390,5 +390,5 @@ pub(crate) fn wants_emoji() -> bool {
 }
 
 pub(crate) fn set_title<T: Display>(title: T) {
-    print!("\x1b]0;{}\x07", title);
+    print!("\x1b]0;{title}\x07");
 }

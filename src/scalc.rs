@@ -1,7 +1,6 @@
-use hound::WavReader;
+use crate::audio::AudioReader;
 use rustfft::{num_complex::Complex, FftPlanner};
 use std::error::Error;
-use std::path::Path;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum WindowType {
@@ -26,23 +25,17 @@ pub struct SpectrogramData {
     pub data: Vec<Vec<f32>>
 }
 
-/// Основная функция модуля: читает WAV и вычисляет спектрограмму
+/// Основная функция модуля: читает аудиофайл и вычисляет спектрограмму
 pub fn calculate_spectrogram<F>(
-    path: &Path,
+    mut reader: Box<dyn AudioReader>,
     params: CalcParams,
     mut progress_callback: F,
 ) -> Result<SpectrogramData, Box<dyn Error>>
 where
     F: FnMut(usize, usize),
 {
-    let mut reader = WavReader::open(path)?;
-    let _spec = reader.spec();
-
-    // Читаем все сэмплы и конвертируем их в f32 в диапазоне [-1.0, 1.0]
-    let samples: Vec<f32> = reader
-        .samples::<i16>()
-        .map(|s| s.unwrap() as f32 / i16::MAX as f32)
-        .collect();
+    // Читаем все сэмплы (уже в диапазоне [-1.0, 1.0])
+    let samples = reader.read_samples()?;
 
     // NOTE: Для ОЧЕНЬ больших файлов здесь нужна потоковая обработка,
     // а не загрузка всего файла в память. Но для демонстрации алгоритма
@@ -106,7 +99,7 @@ where
 }
 
 /// Window function Hann
-pub fn hann_window(size: usize) -> Vec<f32> {
+fn hann_window(size: usize) -> Vec<f32> {
     let mut window = Vec::with_capacity(size);
     for i in 0..size {
         let val = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (size - 1) as f32).cos());
@@ -116,7 +109,7 @@ pub fn hann_window(size: usize) -> Vec<f32> {
 }
 
 /// Window function Hamming
-pub fn hamming_window(size: usize) -> Vec<f32> {
+fn hamming_window(size: usize) -> Vec<f32> {
     let mut window = Vec::with_capacity(size);
     for i in 0..size {
         let val = 0.54 - 0.46 * (2.0 * std::f32::consts::PI * i as f32 / (size - 1) as f32).cos();

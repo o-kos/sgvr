@@ -1,0 +1,6 @@
+name = "test_debug"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+symphonia = { version = "0.5", default-features = false, features = ["pcm", "ogg", "vorbis", "flac", "mp3", "aac", "mp4", "isomp4", "alac"] }

@@ -89,7 +89,7 @@ See `ai/task.md` for detailed technical specifications and implementation approa
 - **User Communication**: Always respond to users in Russian language
 - **Commit Messages**: Write all commit messages in English. Newer write about claude.ai in commit messages
 - **Vendor Directory**: Never modify files in the `vendor/` directory - these are vendored dependencies
-- **Code Style**: Follow Rust conventions and idiomatic patterns  
+- **Code Style**: Follow Rust conventions and idiomatic patterns
 - **Error Handling**: Use proper Result types and meaningful error messages
 - **Performance**: Optimize for large file processing and memory efficiency
-- **Testing**: Write unit tests for core algorithms and integration tests for the complete pipeline
+- **Testing**: Write unit tests for core algorithms and integration tests for the complete pipeline. Put tests in separate file with name `*_tests.rs

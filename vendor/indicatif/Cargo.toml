@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.70"
 name = "indicatif"
-version = "0.17.11"
+version = "0.18.0"
 build = false
 exclude = ["screenshots/*"]
 autolib = false
@@ -41,6 +41,19 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[features]
+default = [
+    "unicode-width",
+    "console/unicode-width",
+]
+futures = ["dep:futures-core"]
+improved_unicode = [
+    "unicode-segmentation",
+    "unicode-width",
+    "console/unicode-width",
+]
+in_memory = ["vt100"]
 
 [lib]
 name = "indicatif"
@@ -139,17 +152,17 @@ name = "render"
 path = "tests/render.rs"
 
 [dependencies.console]
-version = "0.15"
-features = ["ansi-parsing"]
+version = "0.16"
+features = [
+    "ansi-parsing",
+    "std",
+]
 default-features = false
 
 [dependencies.futures-core]
 version = "0.3"
 optional = true
 default-features = false
-
-[dependencies.number_prefix]
-version = "0.4"
 
 [dependencies.portable-atomic]
 version = "1.0.0"
@@ -170,6 +183,9 @@ optional = true
 [dependencies.unicode-width]
 version = "0.2"
 optional = true
+
+[dependencies.unit-prefix]
+version = "0.5.1"
 
 [dependencies.vt100]
 version = "0.15.1"
@@ -201,19 +217,6 @@ features = [
     "time",
     "rt",
 ]
-
-[features]
-default = [
-    "unicode-width",
-    "console/unicode-width",
-]
-futures = ["dep:futures-core"]
-improved_unicode = [
-    "unicode-segmentation",
-    "unicode-width",
-    "console/unicode-width",
-]
-in_memory = ["vt100"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-time]
 version = "1.1.0"
